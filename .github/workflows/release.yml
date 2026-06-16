@@ -57,7 +57,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          args=(--target "$SHA" --title "$VERSION")
+          args=(-R "$REPO" --target "$SHA" --title "$VERSION")
           [ "$PRERELEASE" = "true" ] && args+=(--prerelease)
           if [ -n "${NOTES// }" ]; then
             args+=(--notes "$NOTES")
