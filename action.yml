@@ -20,5 +20,5 @@ outputs:
     description: 'Alias of runtime-token.'
 
 runs:
-  using: 'node20'
+  using: 'node24'
   main: 'index.js'
