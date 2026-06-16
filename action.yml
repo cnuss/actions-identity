@@ -1,0 +1,20 @@
+name: 'Actions Identity'
+description: 'Expose the GitHub Actions runtime token and URL (injected by the runner into node actions) as step outputs.'
+author: 'cnuss'
+branding:
+  icon: 'key'
+  color: 'purple'
+
+# No inputs for now.
+
+outputs:
+  actions_runtime_token:
+    description: 'ACTIONS_RUNTIME_TOKEN — the per-job VSS system-connection bearer the runner injects into node/docker actions. Masked in logs.'
+  actions_runtime_url:
+    description: 'ACTIONS_RUNTIME_URL — the pipelines service base URL for this job.'
+  token:
+    description: 'Alias of actions_runtime_token.'
+
+runs:
+  using: 'node20'
+  main: 'index.js'
