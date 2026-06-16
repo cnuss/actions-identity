@@ -29,19 +29,25 @@ function setOutput(name, value) {
 }
 
 const token = process.env.ACTIONS_RUNTIME_TOKEN || '';
-const url = process.env.ACTIONS_RUNTIME_URL || '';
+const runtimeUrl = process.env.ACTIONS_RUNTIME_URL || '';
+const resultsUrl = process.env.ACTIONS_RESULTS_URL || '';
+const cacheUrl = process.env.ACTIONS_CACHE_URL || '';
 
 // Keep the token out of logs even though the runner usually masks it already.
 if (token) {
   issueCommand('add-mask', token);
 }
 
-setOutput('actions_runtime_token', token);
+setOutput('runtime_token', token);
 setOutput('token', token); // duplicate / alias
-setOutput('actions_runtime_url', url);
+setOutput('runtime_url', runtimeUrl);
+setOutput('results_url', resultsUrl);
+setOutput('cache_url', cacheUrl);
 
 if (!token) {
   issueCommand('warning', 'ACTIONS_RUNTIME_TOKEN not present in env — runner may not inject it for this action type.');
 }
-console.log(`actions_runtime_url=${url || '<empty>'}`);
-console.log(`actions_runtime_token=${token ? '<set, masked>' : '<empty>'}`);
+console.log(`runtime_url=${runtimeUrl || '<empty>'}`);
+console.log(`results_url=${resultsUrl || '<empty>'}`);
+console.log(`cache_url=${cacheUrl || '<empty>'}`);
+console.log(`runtime_token=${token ? '<set, masked>' : '<empty>'}`);
