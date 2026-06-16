@@ -38,11 +38,11 @@ if (token) {
   issueCommand('add-mask', token);
 }
 
-setOutput('runtime_token', token);
+setOutput('runtime-token', token);
 setOutput('token', token); // duplicate / alias
-setOutput('runtime_url', runtimeUrl);
-setOutput('results_url', resultsUrl);
-setOutput('cache_url', cacheUrl);
+setOutput('runtime-url', runtimeUrl);
+setOutput('results-url', resultsUrl);
+setOutput('cache-url', cacheUrl);
 
 if (!token) {
   issueCommand('warning', 'ACTIONS_RUNTIME_TOKEN not present in env — runner may not inject it for this action type.');

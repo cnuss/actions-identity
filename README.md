@@ -13,11 +13,11 @@ cache / results / artifact services with raw cURL).
 
 | output | description |
 |---|---|
-| `runtime_token` | `ACTIONS_RUNTIME_TOKEN` — per-job bearer for the Actions services. Masked in logs. |
-| `runtime_url` | `ACTIONS_RUNTIME_URL` — pipelines service base URL for the job. |
-| `results_url` | `ACTIONS_RESULTS_URL` — results/cache/artifact Twirp service base URL. |
-| `cache_url` | `ACTIONS_CACHE_URL` — legacy artifactcache service base URL. |
-| `token` | Alias of `runtime_token`. |
+| `runtime-token` | `ACTIONS_RUNTIME_TOKEN` — per-job bearer for the Actions services. Masked in logs. |
+| `runtime-url` | `ACTIONS_RUNTIME_URL` — pipelines service base URL for the job. |
+| `results-url` | `ACTIONS_RESULTS_URL` — results/cache/artifact Twirp service base URL. |
+| `cache-url` | `ACTIONS_CACHE_URL` — legacy artifactcache service base URL. |
+| `token` | Alias of `runtime-token`. |
 
 No inputs (for now).
 
@@ -34,7 +34,7 @@ jobs:
       - shell: bash
         env:
           TOKEN: ${{ steps.identity.outputs.token }}
-          RESULTS_URL: ${{ steps.identity.outputs.results_url }}
+          RESULTS_URL: ${{ steps.identity.outputs.results-url }}
         run: |
           echo "results_url = $RESULTS_URL"
           echo "token length = ${#TOKEN}"

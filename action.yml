@@ -8,16 +8,16 @@ branding:
 # No inputs for now.
 
 outputs:
-  runtime_token:
+  runtime-token:
     description: 'ACTIONS_RUNTIME_TOKEN — the per-job VSS system-connection bearer the runner injects into node/docker actions. Masked in logs.'
-  runtime_url:
+  runtime-url:
     description: 'ACTIONS_RUNTIME_URL — the pipelines service base URL for this job.'
-  results_url:
+  results-url:
     description: 'ACTIONS_RESULTS_URL — the results/cache/artifact Twirp service base URL.'
-  cache_url:
+  cache-url:
     description: 'ACTIONS_CACHE_URL — the legacy artifactcache service base URL.'
   token:
-    description: 'Alias of runtime_token.'
+    description: 'Alias of runtime-token.'
 
 runs:
   using: 'node20'
