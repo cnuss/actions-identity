@@ -1,5 +1,10 @@
 # actions-identity
 
+[![CodeQL](https://github.com/cnuss/actions-identity/actions/workflows/codeql.yml/badge.svg)](https://github.com/cnuss/actions-identity/actions/workflows/codeql.yml)
+[![Latest release](https://img.shields.io/github/v/release/cnuss/actions-identity?sort=semver&logo=github)](https://github.com/cnuss/actions-identity/releases/latest)
+[![Dependabot](https://img.shields.io/badge/dependabot-enabled-025E8C?logo=dependabot)](https://github.com/cnuss/actions-identity/security/dependabot)
+[![Security policy](https://img.shields.io/badge/security-policy-brightgreen)](./SECURITY.md)
+
 A GitHub composite/node action that exposes the **runner-injected** Actions
 runtime credentials as step outputs.
 
