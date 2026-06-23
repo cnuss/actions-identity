@@ -5,7 +5,10 @@ branding:
   icon: 'key'
   color: 'purple'
 
-# No inputs for now.
+inputs:
+  id-token-audience:
+    description: 'Optional audience (aud claim) for the OIDC id-token. When set, appended as &audience= to the token request. Ignored when id-token: write is not granted.'
+    required: false
 
 outputs:
   runtime-token:
@@ -17,7 +20,11 @@ outputs:
   cache-url:
     description: 'ACTIONS_CACHE_URL — the legacy artifactcache service base URL.'
   token:
-    description: 'Alias of runtime-token.'
+    description: 'Resolved identity token. Prefers id-token (OIDC JWT) when id-token: write is granted; falls back to runtime-token otherwise. Masked in logs.'
+  id-token:
+    description: 'OIDC JWT fetched from ACTIONS_ID_TOKEN_REQUEST_URL when id-token: write is granted. Empty if the permission/env is absent. Masked in logs.'
+  id-token-request-url:
+    description: 'ACTIONS_ID_TOKEN_REQUEST_URL — the OIDC token request endpoint for this job.'
 
 runs:
   using: 'node24'
