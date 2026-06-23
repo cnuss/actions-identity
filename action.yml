@@ -1,5 +1,5 @@
 name: "Actions Identity"
-description: "Expose the GitHub Actions runtime token and URL (injected by the runner into node actions) as step outputs."
+description: "An accessor to various GitHub Actions identity tokens."
 author: "cnuss"
 branding:
   icon: "key"
@@ -11,20 +11,20 @@ inputs:
     required: false
 
 outputs:
-  runtime-token:
-    description: "ACTIONS_RUNTIME_TOKEN — the per-job VSS system-connection bearer the runner injects into node/docker actions. Masked in logs."
-  runtime-url:
-    description: "ACTIONS_RUNTIME_URL — the pipelines service base URL for this job."
-  results-url:
-    description: "ACTIONS_RESULTS_URL — the results/cache/artifact Twirp service base URL."
   cache-url:
     description: "ACTIONS_CACHE_URL — the legacy artifactcache service base URL."
-  token:
-    description: "Resolved identity token. Prefers id-token (OIDC JWT) when id-token: write is granted; falls back to runtime-token otherwise. Masked in logs."
   id-token:
     description: "OIDC JWT fetched from ACTIONS_ID_TOKEN_REQUEST_URL when id-token: write is granted. Empty if the permission/env is absent. Masked in logs."
   id-token-request-url:
     description: "ACTIONS_ID_TOKEN_REQUEST_URL — the OIDC token request endpoint for this job."
+  results-url:
+    description: "ACTIONS_RESULTS_URL — the results/cache/artifact Twirp service base URL."
+  runtime-token:
+    description: "ACTIONS_RUNTIME_TOKEN — the per-job VSS system-connection bearer the runner injects into node/docker actions. Masked in logs."
+  runtime-url:
+    description: "ACTIONS_RUNTIME_URL — the pipelines service base URL for this job."
+  token:
+    description: "Resolved identity token. Prefers id-token (OIDC JWT) when id-token: write is granted; falls back to runtime-token otherwise. Masked in logs."
 
 runs:
   using: "node24"

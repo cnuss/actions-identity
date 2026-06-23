@@ -29,13 +29,13 @@ back to the runtime token, so consumers can use a single output either way.
 
 | output                 | description                                                                                                         |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `token`                | Resolved identity token: the OIDC id-token when `id-token: write` is granted, else `runtime-token`. Masked in logs. |
-| `runtime-token`        | `ACTIONS_RUNTIME_TOKEN` — per-job bearer for the Actions services. Masked in logs.                                  |
-| `runtime-url`          | `ACTIONS_RUNTIME_URL` — pipelines service base URL for the job.                                                     |
-| `results-url`          | `ACTIONS_RESULTS_URL` — results/cache/artifact Twirp service base URL.                                              |
 | `cache-url`            | `ACTIONS_CACHE_URL` — legacy artifactcache service base URL.                                                        |
 | `id-token`             | OIDC JWT fetched when `id-token: write` is granted; empty otherwise. Masked in logs.                                |
 | `id-token-request-url` | `ACTIONS_ID_TOKEN_REQUEST_URL` — OIDC token request endpoint for the job.                                           |
+| `results-url`          | `ACTIONS_RESULTS_URL` — results/cache/artifact Twirp service base URL.                                              |
+| `runtime-token`        | `ACTIONS_RUNTIME_TOKEN` — per-job bearer for the Actions services. Masked in logs.                                  |
+| `runtime-url`          | `ACTIONS_RUNTIME_URL` — pipelines service base URL for the job.                                                     |
+| `token`                | Resolved identity token: the OIDC id-token when `id-token: write` is granted, else `runtime-token`. Masked in logs. |
 
 ## Usage
 
