@@ -1,31 +1,31 @@
-name: 'Actions Identity'
-description: 'Expose the GitHub Actions runtime token and URL (injected by the runner into node actions) as step outputs.'
-author: 'cnuss'
+name: "Actions Identity"
+description: "Expose the GitHub Actions runtime token and URL (injected by the runner into node actions) as step outputs."
+author: "cnuss"
 branding:
-  icon: 'key'
-  color: 'purple'
+  icon: "key"
+  color: "purple"
 
 inputs:
   id-token-audience:
-    description: 'Optional audience (aud claim) for the OIDC id-token. When set, appended as &audience= to the token request. Ignored when id-token: write is not granted.'
+    description: "Optional audience (aud claim) for the OIDC id-token. When set, appended as &audience= to the token request. Ignored when id-token: write is not granted."
     required: false
 
 outputs:
   runtime-token:
-    description: 'ACTIONS_RUNTIME_TOKEN — the per-job VSS system-connection bearer the runner injects into node/docker actions. Masked in logs.'
+    description: "ACTIONS_RUNTIME_TOKEN — the per-job VSS system-connection bearer the runner injects into node/docker actions. Masked in logs."
   runtime-url:
-    description: 'ACTIONS_RUNTIME_URL — the pipelines service base URL for this job.'
+    description: "ACTIONS_RUNTIME_URL — the pipelines service base URL for this job."
   results-url:
-    description: 'ACTIONS_RESULTS_URL — the results/cache/artifact Twirp service base URL.'
+    description: "ACTIONS_RESULTS_URL — the results/cache/artifact Twirp service base URL."
   cache-url:
-    description: 'ACTIONS_CACHE_URL — the legacy artifactcache service base URL.'
+    description: "ACTIONS_CACHE_URL — the legacy artifactcache service base URL."
   token:
-    description: 'Resolved identity token. Prefers id-token (OIDC JWT) when id-token: write is granted; falls back to runtime-token otherwise. Masked in logs.'
+    description: "Resolved identity token. Prefers id-token (OIDC JWT) when id-token: write is granted; falls back to runtime-token otherwise. Masked in logs."
   id-token:
-    description: 'OIDC JWT fetched from ACTIONS_ID_TOKEN_REQUEST_URL when id-token: write is granted. Empty if the permission/env is absent. Masked in logs.'
+    description: "OIDC JWT fetched from ACTIONS_ID_TOKEN_REQUEST_URL when id-token: write is granted. Empty if the permission/env is absent. Masked in logs."
   id-token-request-url:
-    description: 'ACTIONS_ID_TOKEN_REQUEST_URL — the OIDC token request endpoint for this job.'
+    description: "ACTIONS_ID_TOKEN_REQUEST_URL — the OIDC token request endpoint for this job."
 
 runs:
-  using: 'node24'
-  main: 'index.js'
+  using: "node24"
+  main: "index.js"
