@@ -14,17 +14,28 @@ plain `run:` shells. This action reads them from `process.env` and re-emits them
 as outputs, so a downstream bash step can use them (e.g. to call the Actions
 cache / results / artifact services with raw cURL).
 
+When the job grants `permissions: id-token: write`, the action also fetches an
+**OIDC id-token** from `ACTIONS_ID_TOKEN_REQUEST_URL` and exposes it. The
+`token` output then resolves to the id-token; without the permission it falls
+back to the runtime token, so consumers can use a single output either way.
+
+## Inputs
+
+| input               | required | description                                                                                                                                 |
+| ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id-token-audience` | no       | Audience (`aud` claim) for the OIDC id-token. Appended as `&audience=` to the token request. Ignored when `id-token: write` is not granted. |
+
 ## Outputs
 
-| output | description |
-|---|---|
-| `runtime-token` | `ACTIONS_RUNTIME_TOKEN` — per-job bearer for the Actions services. Masked in logs. |
-| `runtime-url` | `ACTIONS_RUNTIME_URL` — pipelines service base URL for the job. |
-| `results-url` | `ACTIONS_RESULTS_URL` — results/cache/artifact Twirp service base URL. |
-| `cache-url` | `ACTIONS_CACHE_URL` — legacy artifactcache service base URL. |
-| `token` | Alias of `runtime-token`. |
-
-No inputs (for now).
+| output                 | description                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `cache-url`            | `ACTIONS_CACHE_URL` — legacy artifactcache service base URL.                                                        |
+| `id-token`             | OIDC JWT fetched when `id-token: write` is granted; empty otherwise. Masked in logs.                                |
+| `id-token-request-url` | `ACTIONS_ID_TOKEN_REQUEST_URL` — OIDC token request endpoint for the job.                                           |
+| `results-url`          | `ACTIONS_RESULTS_URL` — results/cache/artifact Twirp service base URL.                                              |
+| `runtime-token`        | `ACTIONS_RUNTIME_TOKEN` — per-job bearer for the Actions services. Masked in logs.                                  |
+| `runtime-url`          | `ACTIONS_RUNTIME_URL` — pipelines service base URL for the job.                                                     |
+| `token`                | Resolved identity token: the OIDC id-token when `id-token: write` is granted, else `runtime-token`. Masked in logs. |
 
 ## Usage
 
@@ -43,6 +54,31 @@ jobs:
         run: |
           echo "results_url = $RESULTS_URL"
           echo "token length = ${#TOKEN}"
+```
+
+### With OIDC (`id-token: write`)
+
+Grant the permission and the `token` output becomes the OIDC id-token. Set
+`id-token-audience` to scope the `aud` claim (e.g. for a cloud provider).
+
+```yaml
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # required for the OIDC id-token
+    steps:
+      - id: identity
+        uses: cnuss/actions-identity@main
+        with:
+          id-token-audience: sts.amazonaws.com
+
+      - shell: bash
+        env:
+          ID_TOKEN: ${{ steps.identity.outputs.id-token }}
+        run: |
+          # JWT has three dot-separated parts; decode the payload (claims).
+          echo "$ID_TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq .
 ```
 
 ## Notes
