@@ -1,11 +1,25 @@
 name: Release
 
-# Manual release: tag vX.Y.Z at the current commit, (re)point the moving major
-# tag vX at it, and publish a GitHub Release. Mirrors the manual flow:
-#   git tag vX.Y.Z ; git tag -f vX ; push ; gh release create
-# Done via the REST API (gh) — no checkout, no node.
+# Two jobs:
+#   smoke   — runs this action against itself on every push/PR/tag and on
+#             manual dispatch; writes outputs + decoded JWTs to the summary.
+#   release — manual only (workflow_dispatch), gated on smoke: tag vX.Y.Z at
+#             the current commit, (re)point the moving major tag vX at it, and
+#             publish a GitHub Release. Mirrors the manual flow:
+#               git tag vX.Y.Z ; git tag -f vX ; push ; gh release create
+#             Done via the REST API (gh) — no checkout, no node.
 
 on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+    # Defaults are [opened, synchronize, reopened]. Add ready_for_review
+    # so a draft -> ready transition re-runs CI without an empty push;
+    # keep synchronize explicit so every new commit on the PR triggers a
+    # fresh run.
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
     inputs:
       version:
@@ -22,12 +36,121 @@ on:
         required: false
         type: string
 
+# Least privilege by default; the release job raises contents to write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  release:
+  # Run the action against itself at this commit and record what it
+  # produced. Tokens are never written raw: only their length and the decoded
+  # JWT header/payload (claims) go to the summary.
+  smoke:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: identity
+        uses: ./
+
+      - name: Summarize outputs
+        shell: bash
+        env:
+          CACHE_URL: ${{ steps.identity.outputs.cache-url }}
+          ID_TOKEN: ${{ steps.identity.outputs.id-token }}
+          ID_TOKEN_REQUEST_URL: ${{ steps.identity.outputs.id-token-request-url }}
+          RESULTS_URL: ${{ steps.identity.outputs.results-url }}
+          RUNTIME_TOKEN: ${{ steps.identity.outputs.runtime-token }}
+          RUNTIME_URL: ${{ steps.identity.outputs.runtime-url }}
+          TOKEN: ${{ steps.identity.outputs.token }}
+        run: |
+          set -euo pipefail
+
+          # base64url -> json, padding restored for strict base64 -d
+          b64url_decode() {
+            local s; s=$(printf '%s' "$1" | tr '_-' '/+')
+            case $(( ${#s} % 4 )) in 2) s="$s==";; 3) s="$s=";; esac
+            printf '%s' "$s" | base64 -d
+          }
+
+          # Decode a JWT's header + payload into the summary. Signature omitted.
+          jwt_summary() {
+            local name="$1" tok="$2"
+            echo "### \`$name\`"
+            echo ""
+            if [ -z "$tok" ]; then
+              echo "_empty_"; echo ""; return
+            fi
+            local parts; parts=$(printf '%s' "$tok" | tr -cd '.' | wc -c)
+            if [ "$parts" -ne 2 ]; then
+              echo "_not a JWT (${#tok} chars, $((parts + 1)) segments)_"; echo ""; return
+            fi
+            echo "<details><summary>header</summary>"; echo ""
+            echo '```json'
+            b64url_decode "$(printf '%s' "$tok" | cut -d. -f1)" | jq .
+            echo '```'; echo ""; echo "</details>"; echo ""
+            echo "<details open><summary>payload</summary>"; echo ""
+            echo '```json'
+            b64url_decode "$(printf '%s' "$tok" | cut -d. -f2)" | jq .
+            echo '```'; echo ""; echo "</details>"; echo ""
+          }
+
+          tok_desc() {
+            local tok="$1"
+            if [ -z "$tok" ]; then echo "_empty_"; else echo "JWT, ${#tok} chars"; fi
+          }
+
+          {
+            echo "## Smoke: \`${{ github.repository }}@${{ github.sha }}\`"
+            echo ""
+            echo "| output | value |"
+            echo "|---|---|"
+            echo "| \`cache-url\` | \`${CACHE_URL:-<empty>}\` |"
+            echo "| \`id-token-request-url\` | \`${ID_TOKEN_REQUEST_URL:-<empty>}\` |"
+            echo "| \`results-url\` | \`${RESULTS_URL:-<empty>}\` |"
+            echo "| \`runtime-url\` | \`${RUNTIME_URL:-<empty>}\` |"
+            echo "| \`id-token\` | $(tok_desc "$ID_TOKEN") |"
+            echo "| \`runtime-token\` | $(tok_desc "$RUNTIME_TOKEN") |"
+            echo "| \`token\` | $(tok_desc "$TOKEN") |"
+            echo ""
+            jwt_summary id-token "$ID_TOKEN"
+            jwt_summary runtime-token "$RUNTIME_TOKEN"
+            jwt_summary token "$TOKEN"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Assert outputs
+        shell: bash
+        env:
+          ID_TOKEN: ${{ steps.identity.outputs.id-token }}
+          ID_TOKEN_REQUEST_URL: ${{ steps.identity.outputs.id-token-request-url }}
+          RESULTS_URL: ${{ steps.identity.outputs.results-url }}
+          RUNTIME_TOKEN: ${{ steps.identity.outputs.runtime-token }}
+          RUNTIME_URL: ${{ steps.identity.outputs.runtime-url }}
+          TOKEN: ${{ steps.identity.outputs.token }}
+        run: |
+          set -euo pipefail
+          fail=0
+          need() { if [ -z "$2" ]; then echo "::error::$1 is empty"; fail=1; fi; }
+          need id-token "$ID_TOKEN"
+          need id-token-request-url "$ID_TOKEN_REQUEST_URL"
+          need results-url "$RESULTS_URL"
+          need runtime-token "$RUNTIME_TOKEN"
+          need runtime-url "$RUNTIME_URL"
+          need token "$TOKEN"
+          if [ "$TOKEN" != "$ID_TOKEN" ]; then
+            echo "::error::token should equal id-token when id-token: write is granted"
+            fail=1
+          fi
+          exit "$fail"
+
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    needs: smoke
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       GH_TOKEN: ${{ github.token }}
       REPO: ${{ github.repository }}
