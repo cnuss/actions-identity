@@ -41,6 +41,9 @@ if (!runtimeToken) {
     "warning",
     "ACTIONS_RUNTIME_TOKEN not present in env — runner may not inject it for this action type.",
   );
+} else {
+  // Mask up front so it is hidden on every path, including OIDC success.
+  issueCommand("add-mask", runtimeToken);
 }
 
 let tokenP =
@@ -73,12 +76,10 @@ let tokenP =
         })
         .catch((err) => {
           issueCommand("warning", `Failed to fetch ID token: ${err.message}`);
-          issueCommand("add-mask", runtimeToken);
           setOutput("runtime-token", runtimeToken);
           return runtimeToken;
         })
     : Promise.resolve().then(() => {
-        issueCommand("add-mask", runtimeToken);
         setOutput("runtime-token", runtimeToken);
         return runtimeToken;
       });
