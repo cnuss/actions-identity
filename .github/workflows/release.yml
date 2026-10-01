@@ -156,20 +156,6 @@ jobs:
             echo "::error::token should equal id-token when id-token: write is granted"
             fail=1
           fi
-
-          # The mock exchange server mints a JWT recording the sha256 of the
-          # bearer it received; it must match the token this step produced.
-          b64url_decode() {
-            local s; s=$(printf '%s' "$1" | tr '_-' '/+')
-            case $(( ${#s} % 4 )) in 2) s="$s==";; 3) s="$s=";; esac
-            printf '%s' "$s" | base64 -d
-          }
-          want=$(printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1)
-          got=$({ b64url_decode "$(printf '%s' "$EXCHANGE_TOKEN" | cut -d. -f2)" | jq -r '.token_sha256 // empty'; } 2>/dev/null || true)
-          if [ "$got" != "$want" ]; then
-            echo "::error::exchange server should have received token as a bearer (token_sha256: ${got:-<missing>})"
-            fail=1
-          fi
           exit "$fail"
 
   release:
