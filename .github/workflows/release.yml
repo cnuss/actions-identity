@@ -105,10 +105,8 @@ jobs:
           }
 
           tok_desc() {
-            local tok="$1" parts
-            if [ -z "$tok" ]; then echo "_empty_"; return; fi
-            parts=$(printf '%s' "$tok" | tr -cd '.' | wc -c)
-            if [ "$parts" -eq 2 ]; then echo "JWT, ${#tok} chars"; else echo "opaque, ${#tok} chars"; fi
+            local tok="$1"
+            if [ -z "$tok" ]; then echo "_empty_"; else echo "JWT, ${#tok} chars"; fi
           }
 
           {
