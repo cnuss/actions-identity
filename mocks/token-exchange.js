@@ -1,6 +1,6 @@
 // Stub token exchange endpoint for the smoke job.
 //
-// Answers like npm trusted publishing: POST /token-exchange returns
+// Answers like a typical exchange endpoint: POST /token-exchange returns
 // {"token": <jwt>}; any other path returns 403. The token is an unsigned JWT
 // (alg "none") whose claims describe the bearer it received: its sub/aud, and
 // token_sha256 so the workflow can check which token was sent by decoding the

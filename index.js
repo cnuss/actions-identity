@@ -99,7 +99,7 @@ let tokenP = (
       })
 ).then((token) =>
   // Exchange the token at exchange-url if requested: POST it as a bearer and
-  // expose the `token` field of the JSON response (npm trusted publishing shape).
+  // expose the `token` field of the JSON response.
   // A failed exchange fails the step; `token` passes through either way.
   exchangeUrl
     ? fetch(exchangeUrl, {
