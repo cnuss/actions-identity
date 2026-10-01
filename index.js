@@ -35,7 +35,7 @@ const cacheUrl = process.env.ACTIONS_CACHE_URL || "";
 const idTokenRequestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN || "";
 const idTokenRequestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL || "";
 const idTokenAudience = process.env["INPUT_ID-TOKEN-AUDIENCE"] || "";
-const idTokenExchangeUrl = process.env["INPUT_ID-TOKEN-EXCHANGE-URL"] || "";
+const exchangeUrl = process.env["INPUT_EXCHANGE-URL"] || "";
 
 if (!runtimeToken) {
   issueCommand(
@@ -44,31 +44,31 @@ if (!runtimeToken) {
   );
 }
 
-// The id-token is a bearer credential: only send it over https. Plain http is
+// The token is a bearer credential: only send it over https. Plain http is
 // allowed for loopback hosts so a local stub can stand in for a real endpoint.
 function checkExchangeUrl(raw) {
   let url;
   try {
     url = new URL(raw);
   } catch {
-    throw new Error(`id-token-exchange-url is not a valid URL: ${raw}`);
+    throw new Error(`exchange-url is not a valid URL: ${raw}`);
   }
   const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
   if (url.protocol !== "https:" && !(url.protocol === "http:" && loopback)) {
-    throw new Error(`id-token-exchange-url must use https: ${raw}`);
+    throw new Error(`exchange-url must use https: ${raw}`);
   }
   return url;
 }
 
-// POST the id-token as a bearer to the exchange endpoint and return the
-// `token` field of the JSON response (npm trusted publishing shape).
-function exchangeIdToken(idToken) {
+// POST the token as a bearer to the exchange endpoint and return the `token`
+// field of the JSON response (npm trusted publishing shape).
+function exchange(token) {
   return Promise.resolve()
     .then(() =>
-      fetch(checkExchangeUrl(idTokenExchangeUrl), {
+      fetch(checkExchangeUrl(exchangeUrl), {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${idToken}`,
+          Authorization: `Bearer ${token}`,
           Accept: "application/json",
         },
       }),
@@ -123,31 +123,35 @@ const idTokenP =
         })
     : Promise.resolve("");
 
-// Resolves to the `token` output: the exchanged token when
-// id-token-exchange-url is set, else the id-token, else the runtime token.
-// Rejects when an exchange was requested but can't produce a token — falling
-// back would hand consumers a credential the target service rejects.
+// Resolves to the `token` output: the id-token, else the runtime token.
 const tokenP = idTokenP.then((idToken) => {
   issueCommand("add-mask", runtimeToken);
   setOutput("runtime-token", runtimeToken);
-
-  if (!idTokenExchangeUrl) return idToken || runtimeToken;
-  if (!idToken) {
-    throw new Error(
-      "id-token-exchange-url is set but no id-token is available (is `id-token: write` granted?)",
-    );
-  }
-  return exchangeIdToken(idToken).then(
-    (exchanged) => {
-      issueCommand("add-mask", exchanged);
-      setOutput("id-token-exchange", exchanged);
-      return exchanged;
-    },
-    (err) => {
-      throw new Error(`Failed to exchange id-token: ${err.message}`);
-    },
-  );
+  const token = idToken || runtimeToken;
+  setOutput("token", token); // see action.yml for resolution order
+  return token;
 });
+
+// When exchange-url is set, trade `token` there for `exchange-token`. Fails
+// the step if that can't produce a token, rather than leaving consumers with
+// an empty credential.
+const exchangeP = exchangeUrl
+  ? tokenP
+      .then((token) => {
+        if (!token) throw new Error("no token available to exchange");
+        return exchange(token);
+      })
+      .then(
+        (exchanged) => {
+          issueCommand("add-mask", exchanged);
+          setOutput("exchange-token", exchanged);
+          return exchanged;
+        },
+        (err) => {
+          throw new Error(`Failed to exchange token: ${err.message}`);
+        },
+      )
+  : Promise.resolve("");
 
 setOutput("runtime-url", runtimeUrl);
 setOutput("results-url", resultsUrl);
@@ -159,10 +163,10 @@ console.log(`runtime_url=${runtimeUrl || "<empty>"}`);
 console.log(`results_url=${resultsUrl || "<empty>"}`);
 console.log(`cache_url=${cacheUrl || "<empty>"}`);
 
-tokenP
-  .then((token) => {
-    setOutput("token", token); // see action.yml for resolution order
+Promise.all([tokenP, exchangeP])
+  .then(([token]) => {
     console.log(`token=${token ? "<set, masked>" : "<empty>"}`);
+    if (exchangeUrl) console.log("exchange_token=<set, masked>");
   })
   .catch((err) => {
     issueCommand("error", err.message);

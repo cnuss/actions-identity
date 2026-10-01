@@ -1,10 +1,10 @@
-"""Stub id-token exchange endpoint for the smoke job.
+"""Stub token exchange endpoint for the smoke job.
 
 Answers like npm trusted publishing: POST /token-exchange returns
 {"token": <jwt>}; any other path returns 403. The token is an unsigned JWT
-(alg "none") whose claims describe the bearer it received: the id-token's
-sub/aud, and id_token_sha256 so the workflow can check which token was sent
-by decoding the claims, which survive log masking of the token itself.
+(alg "none") whose claims describe the bearer it received: its sub/aud, and
+token_sha256 so the workflow can check which token was sent by decoding the
+claims, which survive log masking of the token itself.
 
 Usage: python3 mocks/token_exchange.py [port]
 
@@ -37,8 +37,8 @@ def jwt_claims(token):
         return {}
 
 
-def mint_token(id_token):
-    claims = jwt_claims(id_token)
+def mint_token(token):
+    claims = jwt_claims(token)
     now = int(time.time())
     header = {"alg": "none", "typ": "JWT"}
     payload = {
@@ -47,7 +47,7 @@ def mint_token(id_token):
         "aud": claims.get("aud"),
         "iat": now,
         "exp": now + 300,
-        "id_token_sha256": hashlib.sha256(id_token.encode()).hexdigest(),
+        "token_sha256": hashlib.sha256(token.encode()).hexdigest(),
     }
     return ".".join(
         b64url_encode(json.dumps(part, separators=(",", ":")).encode())

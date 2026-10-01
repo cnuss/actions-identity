@@ -9,17 +9,17 @@ inputs:
   id-token-audience:
     description: "Optional audience (aud claim) for the OIDC id-token. When set, appended as &audience= to the token request. Ignored when id-token: write is not granted."
     required: false
-  id-token-exchange-url:
-    description: "Optional URL to exchange the OIDC id-token at (e.g. npm trusted publishing). When set, the id-token is POSTed as a bearer token and the `token` field of the JSON response becomes the `token` output. Must be https (http allowed for loopback). Fails the step if no id-token is available or the exchange fails."
+  exchange-url:
+    description: "Optional URL to exchange the resolved token at (e.g. npm trusted publishing). When set, the `token` output is POSTed as a bearer token and the `token` field of the JSON response becomes the `exchange-token` output. Must be https (http allowed for loopback). Fails the step if the exchange fails."
     required: false
 
 outputs:
   cache-url:
     description: "ACTIONS_CACHE_URL — the legacy artifactcache service base URL."
+  exchange-token:
+    description: "Token returned by exchange-url (the `token` field of its JSON response). Empty when the input is not set. Masked in logs."
   id-token:
     description: "OIDC JWT fetched from ACTIONS_ID_TOKEN_REQUEST_URL when id-token: write is granted. Empty if the permission/env is absent. Masked in logs."
-  id-token-exchange:
-    description: "Token returned by id-token-exchange-url (the `token` field of its JSON response). Empty when the input is not set. Masked in logs."
   id-token-request-url:
     description: "ACTIONS_ID_TOKEN_REQUEST_URL — the OIDC token request endpoint for this job."
   results-url:
@@ -29,7 +29,7 @@ outputs:
   runtime-url:
     description: "ACTIONS_RUNTIME_URL — the pipelines service base URL for this job."
   token:
-    description: "Resolved identity token. id-token-exchange when id-token-exchange-url is set; otherwise id-token (OIDC JWT) when id-token: write is granted; falls back to runtime-token otherwise. Masked in logs."
+    description: "Resolved identity token. Prefers id-token (OIDC JWT) when id-token: write is granted; falls back to runtime-token otherwise. Masked in logs."
 
 runs:
   using: "node24"

@@ -59,14 +59,14 @@ jobs:
       - id: identity
         uses: ./
         with:
-          id-token-exchange-url: http://127.0.0.1:8787/token-exchange
+          exchange-url: http://127.0.0.1:8787/token-exchange
 
       - name: Summarize outputs
         shell: bash
         env:
           CACHE_URL: ${{ steps.identity.outputs.cache-url }}
+          EXCHANGE_TOKEN: ${{ steps.identity.outputs.exchange-token }}
           ID_TOKEN: ${{ steps.identity.outputs.id-token }}
-          ID_TOKEN_EXCHANGE: ${{ steps.identity.outputs.id-token-exchange }}
           ID_TOKEN_REQUEST_URL: ${{ steps.identity.outputs.id-token-request-url }}
           RESULTS_URL: ${{ steps.identity.outputs.results-url }}
           RUNTIME_TOKEN: ${{ steps.identity.outputs.runtime-token }}
@@ -121,21 +121,21 @@ jobs:
             echo "| \`results-url\` | \`${RESULTS_URL:-<empty>}\` |"
             echo "| \`runtime-url\` | \`${RUNTIME_URL:-<empty>}\` |"
             echo "| \`id-token\` | $(tok_desc "$ID_TOKEN") |"
-            echo "| \`id-token-exchange\` | $(tok_desc "$ID_TOKEN_EXCHANGE") |"
             echo "| \`runtime-token\` | $(tok_desc "$RUNTIME_TOKEN") |"
             echo "| \`token\` | $(tok_desc "$TOKEN") |"
+            echo "| \`exchange-token\` | $(tok_desc "$EXCHANGE_TOKEN") |"
             echo ""
             jwt_summary id-token "$ID_TOKEN"
-            jwt_summary id-token-exchange "$ID_TOKEN_EXCHANGE"
             jwt_summary runtime-token "$RUNTIME_TOKEN"
             jwt_summary token "$TOKEN"
+            jwt_summary exchange-token "$EXCHANGE_TOKEN"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Assert outputs
         shell: bash
         env:
+          EXCHANGE_TOKEN: ${{ steps.identity.outputs.exchange-token }}
           ID_TOKEN: ${{ steps.identity.outputs.id-token }}
-          ID_TOKEN_EXCHANGE: ${{ steps.identity.outputs.id-token-exchange }}
           ID_TOKEN_REQUEST_URL: ${{ steps.identity.outputs.id-token-request-url }}
           RESULTS_URL: ${{ steps.identity.outputs.results-url }}
           RUNTIME_TOKEN: ${{ steps.identity.outputs.runtime-token }}
@@ -146,28 +146,28 @@ jobs:
           fail=0
           need() { if [ -z "$2" ]; then echo "::error::$1 is empty"; fail=1; fi; }
           need id-token "$ID_TOKEN"
-          need id-token-exchange "$ID_TOKEN_EXCHANGE"
           need id-token-request-url "$ID_TOKEN_REQUEST_URL"
           need results-url "$RESULTS_URL"
           need runtime-token "$RUNTIME_TOKEN"
           need runtime-url "$RUNTIME_URL"
           need token "$TOKEN"
-          if [ "$TOKEN" != "$ID_TOKEN_EXCHANGE" ]; then
-            echo "::error::token should equal id-token-exchange when id-token-exchange-url is set"
+          need exchange-token "$EXCHANGE_TOKEN"
+          if [ "$TOKEN" != "$ID_TOKEN" ]; then
+            echo "::error::token should equal id-token when id-token: write is granted"
             fail=1
           fi
 
           # The mock exchange server mints a JWT recording the sha256 of the
-          # bearer it received; it must match the id-token this step produced.
+          # bearer it received; it must match the token this step produced.
           b64url_decode() {
             local s; s=$(printf '%s' "$1" | tr '_-' '/+')
             case $(( ${#s} % 4 )) in 2) s="$s==";; 3) s="$s=";; esac
             printf '%s' "$s" | base64 -d
           }
-          want=$(printf '%s' "$ID_TOKEN" | sha256sum | cut -d' ' -f1)
-          got=$({ b64url_decode "$(printf '%s' "$ID_TOKEN_EXCHANGE" | cut -d. -f2)" | jq -r '.id_token_sha256 // empty'; } 2>/dev/null || true)
+          want=$(printf '%s' "$TOKEN" | sha256sum | cut -d' ' -f1)
+          got=$({ b64url_decode "$(printf '%s' "$EXCHANGE_TOKEN" | cut -d. -f2)" | jq -r '.token_sha256 // empty'; } 2>/dev/null || true)
           if [ "$got" != "$want" ]; then
-            echo "::error::exchange server should have received the id-token as a bearer (id_token_sha256: ${got:-<missing>})"
+            echo "::error::exchange server should have received token as a bearer (token_sha256: ${got:-<missing>})"
             fail=1
           fi
           exit "$fail"

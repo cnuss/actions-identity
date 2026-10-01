@@ -21,28 +21,28 @@ back to the runtime token, so consumers can use a single output either way.
 
 Some services (e.g. npm trusted publishing) don't accept the OIDC JWT directly
 and instead trade it at an exchange endpoint for their own short-lived token.
-Set `id-token-exchange-url` and the action does that exchange for you: `token`
-becomes the exchanged token.
+Set `exchange-url` and the action does that exchange for you: it POSTs `token`
+there and exposes the result as `exchange-token`.
 
 ## Inputs
 
-| input                   | required | description                                                                                                                                                                                                                                                         |
-| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id-token-audience`     | no       | Audience (`aud` claim) for the OIDC id-token. Appended as `&audience=` to the token request. Ignored when `id-token: write` is not granted.                                                                                                                         |
-| `id-token-exchange-url` | no       | URL to exchange the id-token at. The id-token is POSTed as `Authorization: Bearer`; the `token` field of the JSON response becomes the `token` output. Must be `https` (`http` allowed for loopback). Fails the step if there is no id-token or the exchange fails. |
+| input               | required | description                                                                                                                                                                                                                                |
+| ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id-token-audience` | no       | Audience (`aud` claim) for the OIDC id-token. Appended as `&audience=` to the token request. Ignored when `id-token: write` is not granted.                                                                                                |
+| `exchange-url`      | no       | URL to exchange `token` at. `token` is POSTed as `Authorization: Bearer`; the `token` field of the JSON response becomes the `exchange-token` output. Must be `https` (`http` allowed for loopback). Fails the step if the exchange fails. |
 
 ## Outputs
 
-| output                 | description                                                                                                                                                                       |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cache-url`            | `ACTIONS_CACHE_URL` — legacy artifactcache service base URL.                                                                                                                      |
-| `id-token`             | OIDC JWT fetched when `id-token: write` is granted; empty otherwise. Masked in logs.                                                                                              |
-| `id-token-exchange`    | Token returned by `id-token-exchange-url`; empty when the input is not set. Masked in logs.                                                                                       |
-| `id-token-request-url` | `ACTIONS_ID_TOKEN_REQUEST_URL` — OIDC token request endpoint for the job.                                                                                                         |
-| `results-url`          | `ACTIONS_RESULTS_URL` — results/cache/artifact Twirp service base URL.                                                                                                            |
-| `runtime-token`        | `ACTIONS_RUNTIME_TOKEN` — per-job bearer for the Actions services. Masked in logs.                                                                                                |
-| `runtime-url`          | `ACTIONS_RUNTIME_URL` — pipelines service base URL for the job.                                                                                                                   |
-| `token`                | Resolved identity token: `id-token-exchange` when `id-token-exchange-url` is set, else the OIDC id-token when `id-token: write` is granted, else `runtime-token`. Masked in logs. |
+| output                 | description                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `cache-url`            | `ACTIONS_CACHE_URL` — legacy artifactcache service base URL.                                                        |
+| `exchange-token`       | Token returned by `exchange-url`; empty when the input is not set. Masked in logs.                                  |
+| `id-token`             | OIDC JWT fetched when `id-token: write` is granted; empty otherwise. Masked in logs.                                |
+| `id-token-request-url` | `ACTIONS_ID_TOKEN_REQUEST_URL` — OIDC token request endpoint for the job.                                           |
+| `results-url`          | `ACTIONS_RESULTS_URL` — results/cache/artifact Twirp service base URL.                                              |
+| `runtime-token`        | `ACTIONS_RUNTIME_TOKEN` — per-job bearer for the Actions services. Masked in logs.                                  |
+| `runtime-url`          | `ACTIONS_RUNTIME_URL` — pipelines service base URL for the job.                                                     |
+| `token`                | Resolved identity token: the OIDC id-token when `id-token: write` is granted, else `runtime-token`. Masked in logs. |
 
 ## Usage
 
@@ -88,7 +88,7 @@ jobs:
           echo "$ID_TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq .
 ```
 
-### Exchanging the id-token (npm trusted publishing)
+### Exchanging the token (npm trusted publishing)
 
 npm trusted publishing takes the OIDC id-token (with `aud=npm:registry.npmjs.org`)
 at an exchange endpoint and returns a short-lived publish token. `npm publish`
@@ -106,11 +106,11 @@ jobs:
         uses: cnuss/actions-identity@v1
         with:
           id-token-audience: npm:registry.npmjs.org
-          id-token-exchange-url: https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/some-package-name
+          exchange-url: https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/some-package-name
 
       - run: yarn publish --non-interactive
         env:
-          NODE_AUTH_TOKEN: ${{ steps.identity.outputs.token }}
+          NODE_AUTH_TOKEN: ${{ steps.identity.outputs.exchange-token }}
 ```
 
 For a scoped package, URL-encode the slash in the name, e.g.
