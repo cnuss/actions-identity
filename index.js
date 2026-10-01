@@ -95,37 +95,31 @@ let tokenP = (
   // expose the `token` field of the JSON response (npm trusted publishing shape).
   // A failed exchange fails the step; `token` passes through either way.
   exchangeUrl
-    ? Promise.resolve(exchangeUrl)
-        .then((url) => {
-          if (!token) throw new Error("no token available to exchange");
-          return fetch(url, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              Accept: "application/json",
-            },
-          });
-        })
-        .then(async (res) => {
-          if (!res.ok) {
-            const body = (await res.text().catch(() => "")).slice(0, 500);
-            throw new Error(`HTTP ${res.status}${body ? `: ${body}` : ""}`);
-          }
+    ? fetch(exchangeUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
         })
         .then((data) => {
-          if (typeof data?.token !== "string" || !data.token) {
-            throw new Error("response missing token");
-          }
-          issueCommand("add-mask", data.token);
-          setOutput("exchange-token", data.token);
-          console.log("exchange_token=<set, masked>");
+          if (!data?.token) throw new Error("response missing token");
+          return data.token;
+        })
+        .then((exchangeToken) => {
+          issueCommand("add-mask", exchangeToken);
+          setOutput("exchange-token", exchangeToken);
+          return token;
         })
         .catch((err) => {
           issueCommand("error", `Failed to exchange token: ${err.message}`);
           process.exitCode = 1;
+          return token;
         })
-        .then(() => token)
     : token,
 );
 
