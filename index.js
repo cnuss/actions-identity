@@ -106,14 +106,7 @@ tokenP
       ? Promise.resolve(new URL(exchangeUrl))
           .then((url) => {
             // The token is a bearer credential: warn when it isn't sent over https.
-            // Plain http to loopback hosts (e.g. a local stub) is expected.
-            const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(
-              url.hostname,
-            );
-            if (
-              url.protocol !== "https:" &&
-              !(url.protocol === "http:" && loopback)
-            ) {
+            if (url.protocol !== "https:") {
               issueCommand(
                 "warning",
                 `exchange-url is not https; the token will be sent unencrypted: ${exchangeUrl}`,

@@ -26,10 +26,10 @@ there and exposes the result as `exchange-token`.
 
 ## Inputs
 
-| input               | required | description                                                                                                                                                                                                                         |
-| ------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id-token-audience` | no       | Audience (`aud` claim) for the OIDC id-token. Appended as `&audience=` to the token request. Ignored when `id-token: write` is not granted.                                                                                         |
-| `exchange-url`      | no       | URL to exchange `token` at. `token` is POSTed as `Authorization: Bearer`; the `token` field of the JSON response becomes the `exchange-token` output. Warns if not `https` (except loopback). Fails the step if the exchange fails. |
+| input               | required | description                                                                                                                                                                                                       |
+| ------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id-token-audience` | no       | Audience (`aud` claim) for the OIDC id-token. Appended as `&audience=` to the token request. Ignored when `id-token: write` is not granted.                                                                       |
+| `exchange-url`      | no       | URL to exchange `token` at. `token` is POSTed as `Authorization: Bearer`; the `token` field of the JSON response becomes the `exchange-token` output. Warns if not `https`. Fails the step if the exchange fails. |
 
 ## Outputs
 
