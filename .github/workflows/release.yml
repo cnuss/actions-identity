@@ -54,7 +54,7 @@ jobs:
 
       - name: Start token exchange server
         run: |
-          python3 mocks/token_exchange.py
+          node mocks/token-exchange.js
 
       - id: identity
         uses: ./
