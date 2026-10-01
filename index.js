@@ -105,8 +105,8 @@ tokenP
     exchangeUrl
       ? Promise.resolve(new URL(exchangeUrl))
           .then((url) => {
-            // The token is a bearer credential: only send it over https. Plain http is
-            // allowed for loopback hosts so a local stub can stand in for a real endpoint.
+            // The token is a bearer credential: warn when it isn't sent over https.
+            // Plain http to loopback hosts (e.g. a local stub) is expected.
             const loopback = ["localhost", "127.0.0.1", "[::1]"].includes(
               url.hostname,
             );
@@ -114,7 +114,10 @@ tokenP
               url.protocol !== "https:" &&
               !(url.protocol === "http:" && loopback)
             ) {
-              throw new Error(`exchange-url must use https: ${exchangeUrl}`);
+              issueCommand(
+                "warning",
+                `exchange-url is not https; the token will be sent unencrypted: ${exchangeUrl}`,
+              );
             }
             if (!token) throw new Error("no token available to exchange");
             return fetch(url, {

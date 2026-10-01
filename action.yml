@@ -10,7 +10,7 @@ inputs:
     description: "Optional audience (aud claim) for the OIDC id-token. When set, appended as &audience= to the token request. Ignored when id-token: write is not granted."
     required: false
   exchange-url:
-    description: "Optional URL to exchange the resolved token at (e.g. npm trusted publishing). When set, the `token` output is POSTed as a bearer token and the `token` field of the JSON response becomes the `exchange-token` output. Must be https (http allowed for loopback). Fails the step if the exchange fails."
+    description: "Optional URL to exchange the resolved token at (e.g. npm trusted publishing). When set, the `token` output is POSTed as a bearer token and the `token` field of the JSON response becomes the `exchange-token` output. Warns if not https (except loopback). Fails the step if the exchange fails."
     required: false
 
 outputs:
