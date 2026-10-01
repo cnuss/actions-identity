@@ -2,7 +2,7 @@ name: "Actions Identity"
 description: "An accessor to various GitHub Actions identity tokens."
 author: "cnuss"
 branding:
-  icon: "key"
+  icon: "lock"
   color: "purple"
 
 inputs:
