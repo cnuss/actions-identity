@@ -149,15 +149,7 @@ jobs:
       # (mocks/token_exchange.py) that records the bearer it receives and
       # answers like npm ({"token": ...}).
       - name: Start stub exchange server
-        shell: bash
-        run: |
-          set -euo pipefail
-          nohup python3 mocks/token_exchange.py "$RUNNER_TEMP" >/dev/null 2>&1 &
-          for _ in $(seq 1 50); do
-            (exec 3<>/dev/tcp/127.0.0.1/8787) 2>/dev/null && exit 0
-            sleep 0.1
-          done
-          echo "::error::stub exchange server did not start"; exit 1
+        run: python3 mocks/token_exchange.py
 
       - id: exchange
         uses: ./

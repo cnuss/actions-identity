@@ -2,18 +2,22 @@
 
 Answers like npm trusted publishing: POST /ok returns {"token": ...}; any
 other path returns 403. The Authorization header of each request is written
-to <out-dir>/exchange_bearer so the workflow can assert what was sent.
+to $RUNNER_TEMP/exchange_bearer so the workflow can assert what was sent.
 
-Usage: python3 mocks/token_exchange.py <out-dir> [port]
+Usage: python3 mocks/token_exchange.py [port]
+
+Daemonizes itself once the port is listening, so the command returns only
+when the server is ready: no `&`, and no wait loop in the workflow.
 """
 
 import json
 import os
 import sys
+import tempfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-OUT_DIR = sys.argv[1]
-PORT = int(sys.argv[2]) if len(sys.argv) > 2 else 8787
+OUT_DIR = os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
+PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8787
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -31,4 +35,21 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-HTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+# Bind (and listen) before forking: once the parent exits, connections succeed.
+server = HTTPServer(("127.0.0.1", PORT), Handler)
+print(f"token exchange stub listening on http://127.0.0.1:{PORT}", flush=True)
+
+# Double-fork so the server is reparented away from the step's shell and can't
+# reacquire a controlling terminal.
+if os.fork() > 0:
+    os._exit(0)
+os.setsid()
+if os.fork() > 0:
+    os._exit(0)
+
+# Detach stdio so the runner isn't left waiting on the step's output pipes.
+devnull = os.open(os.devnull, os.O_RDWR)
+for fd in (0, 1, 2):
+    os.dup2(devnull, fd)
+
+server.serve_forever()
