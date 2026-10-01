@@ -14,6 +14,13 @@ function issueCommand(command, message) {
   process.stdout.write(`::${command}::${message}\n`);
 }
 
+// Mirrors @actions/core setFailed: log an error annotation and fail the step
+// without exiting early, so pending output writes still complete.
+function setFailed(message) {
+  issueCommand("error", message);
+  process.exitCode = 1;
+}
+
 function setOutput(name, value) {
   const filePath = process.env.GITHUB_OUTPUT;
   const val = value ?? "";
@@ -35,6 +42,7 @@ const cacheUrl = process.env.ACTIONS_CACHE_URL || "";
 const idTokenRequestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN || "";
 const idTokenRequestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL || "";
 const idTokenAudience = process.env["INPUT_ID-TOKEN-AUDIENCE"] || "";
+const exchangeUrl = process.env["INPUT_EXCHANGE-URL"] || "";
 
 if (!runtimeToken) {
   issueCommand(
@@ -43,7 +51,14 @@ if (!runtimeToken) {
   );
 }
 
-let tokenP =
+if (exchangeUrl && !/^https:\/\//i.test(exchangeUrl)) {
+  issueCommand(
+    "warning",
+    `exchange-url is not https — the token will be sent unencrypted: ${exchangeUrl}`,
+  );
+}
+
+let tokenP = (
   idTokenRequestToken && idTokenRequestUrl
     ? fetch(
         // Append audience query param if requested. The runner will ignore it if the permission is not granted.
@@ -81,7 +96,38 @@ let tokenP =
         issueCommand("add-mask", runtimeToken);
         setOutput("runtime-token", runtimeToken);
         return runtimeToken;
-      });
+      })
+).then((token) =>
+  // Exchange the token at exchange-url if requested: POST it as a bearer and
+  // expose the `token` field of the JSON response.
+  // A failed exchange fails the step; `token` passes through either way.
+  exchangeUrl
+    ? fetch(exchangeUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      })
+        .then((res) => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return res.json();
+        })
+        .then((data) => {
+          if (!data?.token) throw new Error("response missing token");
+          return data.token;
+        })
+        .then((exchangeToken) => {
+          issueCommand("add-mask", exchangeToken);
+          setOutput("exchange-token", exchangeToken);
+          return token;
+        })
+        .catch((err) => {
+          setFailed(`Failed to exchange token: ${err.message}`);
+          return token;
+        })
+    : token,
+);
 
 tokenP.then((token) => {
   setOutput("token", token); // id-token if available, else runtime-token (see action.yml)

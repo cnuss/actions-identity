@@ -23,16 +23,16 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version, e.g. v1.0.2 (must be vMAJOR.MINOR.PATCH)'
+        description: "Release version, e.g. v1.0.2 (must be vMAJOR.MINOR.PATCH)"
         required: true
         type: string
       prerelease:
-        description: 'Mark as pre-release'
+        description: "Mark as pre-release"
         required: false
         type: boolean
         default: false
       notes:
-        description: 'Release notes (leave blank to auto-generate from commits)'
+        description: "Release notes (leave blank to auto-generate from commits)"
         required: false
         type: string
 
@@ -52,13 +52,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Start token exchange server
+        run: |
+          node mocks/token-exchange.js
+
       - id: identity
         uses: ./
+        with:
+          exchange-url: http://127.0.0.1:8787/token-exchange
 
       - name: Summarize outputs
         shell: bash
         env:
           CACHE_URL: ${{ steps.identity.outputs.cache-url }}
+          EXCHANGE_TOKEN: ${{ steps.identity.outputs.exchange-token }}
           ID_TOKEN: ${{ steps.identity.outputs.id-token }}
           ID_TOKEN_REQUEST_URL: ${{ steps.identity.outputs.id-token-request-url }}
           RESULTS_URL: ${{ steps.identity.outputs.results-url }}
@@ -114,15 +121,18 @@ jobs:
             echo "| \`id-token\` | $(tok_desc "$ID_TOKEN") |"
             echo "| \`runtime-token\` | $(tok_desc "$RUNTIME_TOKEN") |"
             echo "| \`token\` | $(tok_desc "$TOKEN") |"
+            echo "| \`exchange-token\` | $(tok_desc "$EXCHANGE_TOKEN") |"
             echo ""
             jwt_summary id-token "$ID_TOKEN"
             jwt_summary runtime-token "$RUNTIME_TOKEN"
             jwt_summary token "$TOKEN"
+            jwt_summary exchange-token "$EXCHANGE_TOKEN"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Assert outputs
         shell: bash
         env:
+          EXCHANGE_TOKEN: ${{ steps.identity.outputs.exchange-token }}
           ID_TOKEN: ${{ steps.identity.outputs.id-token }}
           ID_TOKEN_REQUEST_URL: ${{ steps.identity.outputs.id-token-request-url }}
           RESULTS_URL: ${{ steps.identity.outputs.results-url }}
@@ -139,6 +149,7 @@ jobs:
           need runtime-token "$RUNTIME_TOKEN"
           need runtime-url "$RUNTIME_URL"
           need token "$TOKEN"
+          need exchange-token "$EXCHANGE_TOKEN"
           if [ "$TOKEN" != "$ID_TOKEN" ]; then
             echo "::error::token should equal id-token when id-token: write is granted"
             fail=1

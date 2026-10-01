@@ -2,17 +2,22 @@ name: "Actions Identity"
 description: "An accessor to various GitHub Actions identity tokens."
 author: "cnuss"
 branding:
-  icon: "key"
+  icon: "lock"
   color: "purple"
 
 inputs:
   id-token-audience:
     description: "Optional audience (aud claim) for the OIDC id-token. When set, appended as &audience= to the token request. Ignored when id-token: write is not granted."
     required: false
+  exchange-url:
+    description: "Optional URL to exchange the resolved token at for a service-issued token. When set, the `token` output is POSTed as a bearer token and the `token` field of the JSON response becomes the `exchange-token` output. Warns if not https. Fails the step if the exchange fails."
+    required: false
 
 outputs:
   cache-url:
     description: "ACTIONS_CACHE_URL — the legacy artifactcache service base URL."
+  exchange-token:
+    description: "Token returned by exchange-url (the `token` field of its JSON response). Empty when the input is not set. Masked in logs."
   id-token:
     description: "OIDC JWT fetched from ACTIONS_ID_TOKEN_REQUEST_URL when id-token: write is granted. Empty if the permission/env is absent. Masked in logs."
   id-token-request-url:

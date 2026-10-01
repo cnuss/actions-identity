@@ -19,17 +19,24 @@ When the job grants `permissions: id-token: write`, the action also fetches an
 `token` output then resolves to the id-token; without the permission it falls
 back to the runtime token, so consumers can use a single output either way.
 
+Some services don't accept these tokens directly and instead trade them at an
+exchange endpoint for their own short-lived token. Set `exchange-url` and the
+action does that exchange for you: it POSTs `token` there and exposes the
+result as `exchange-token`.
+
 ## Inputs
 
-| input               | required | description                                                                                                                                 |
-| ------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `id-token-audience` | no       | Audience (`aud` claim) for the OIDC id-token. Appended as `&audience=` to the token request. Ignored when `id-token: write` is not granted. |
+| input               | required | description                                                                                                                                                                                                       |
+| ------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id-token-audience` | no       | Audience (`aud` claim) for the OIDC id-token. Appended as `&audience=` to the token request. Ignored when `id-token: write` is not granted.                                                                       |
+| `exchange-url`      | no       | URL to exchange `token` at. `token` is POSTed as `Authorization: Bearer`; the `token` field of the JSON response becomes the `exchange-token` output. Warns if not `https`. Fails the step if the exchange fails. |
 
 ## Outputs
 
 | output                 | description                                                                                                         |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `cache-url`            | `ACTIONS_CACHE_URL` — legacy artifactcache service base URL.                                                        |
+| `exchange-token`       | Token returned by `exchange-url`; empty when the input is not set. Masked in logs.                                  |
 | `id-token`             | OIDC JWT fetched when `id-token: write` is granted; empty otherwise. Masked in logs.                                |
 | `id-token-request-url` | `ACTIONS_ID_TOKEN_REQUEST_URL` — OIDC token request endpoint for the job.                                           |
 | `results-url`          | `ACTIONS_RESULTS_URL` — results/cache/artifact Twirp service base URL.                                              |
@@ -79,6 +86,40 @@ jobs:
         run: |
           # JWT has three dot-separated parts; decode the payload (claims).
           echo "$ID_TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq .
+```
+
+### Exchanging the token
+
+Set `exchange-url` to trade `token` for a service's own credential. The action
+sends:
+
+```
+POST <exchange-url>
+Authorization: Bearer <token>
+Accept: application/json
+```
+
+and expects a 2xx JSON response with a `token` field, which becomes the
+`exchange-token` output. A non-2xx response or a missing `token` fails the step.
+
+```yaml
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - id: identity
+        uses: cnuss/actions-identity@main
+        with:
+          id-token-audience: https://api.example.com
+          exchange-url: https://api.example.com/oidc/token/exchange
+
+      - shell: bash
+        env:
+          API_TOKEN: ${{ steps.identity.outputs.exchange-token }}
+        run: |
+          curl -sSf -H "Authorization: Bearer $API_TOKEN" https://api.example.com/whoami
 ```
 
 ## Notes
