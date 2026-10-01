@@ -19,10 +19,10 @@ When the job grants `permissions: id-token: write`, the action also fetches an
 `token` output then resolves to the id-token; without the permission it falls
 back to the runtime token, so consumers can use a single output either way.
 
-Some services (e.g. npm trusted publishing) don't accept the OIDC JWT directly
-and instead trade it at an exchange endpoint for their own short-lived token.
-Set `exchange-url` and the action does that exchange for you: it POSTs `token`
-there and exposes the result as `exchange-token`.
+Some services don't accept these tokens directly and instead trade them at an
+exchange endpoint for their own short-lived token. Set `exchange-url` and the
+action does that exchange for you: it POSTs `token` there and exposes the
+result as `exchange-token`.
 
 ## Inputs
 
@@ -88,33 +88,39 @@ jobs:
           echo "$ID_TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq .
 ```
 
-### Exchanging the token (npm trusted publishing)
+### Exchanging the token
 
-npm trusted publishing takes the OIDC id-token (with `aud=npm:registry.npmjs.org`)
-at an exchange endpoint and returns a short-lived publish token. `npm publish`
-(npm ≥ 11.5.1) does this itself; for tools that don't, like `yarn publish` on
-yarn 1, let the action do it:
+Set `exchange-url` to trade `token` for a service's own credential. The action
+sends:
+
+```
+POST <exchange-url>
+Authorization: Bearer <token>
+Accept: application/json
+```
+
+and expects a 2xx JSON response with a `token` field, which becomes the
+`exchange-token` output. A non-2xx response or a missing `token` fails the step.
 
 ```yaml
 jobs:
-  publish:
+  demo:
     runs-on: ubuntu-latest
     permissions:
       id-token: write
     steps:
       - id: identity
-        uses: cnuss/actions-identity@v1
+        uses: cnuss/actions-identity@main
         with:
-          id-token-audience: npm:registry.npmjs.org
-          exchange-url: https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/some-package-name
+          id-token-audience: https://api.example.com
+          exchange-url: https://api.example.com/oidc/token/exchange
 
-      - run: yarn publish --non-interactive
+      - shell: bash
         env:
-          NODE_AUTH_TOKEN: ${{ steps.identity.outputs.exchange-token }}
+          API_TOKEN: ${{ steps.identity.outputs.exchange-token }}
+        run: |
+          curl -sSf -H "Authorization: Bearer $API_TOKEN" https://api.example.com/whoami
 ```
-
-For a scoped package, URL-encode the slash in the name, e.g.
-`.../exchange/package/@scope%2fname`.
 
 ## Notes
 
