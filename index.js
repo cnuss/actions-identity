@@ -44,7 +44,7 @@ if (!runtimeToken) {
   );
 }
 
-let tokenP =
+let tokenP = (
   idTokenRequestToken && idTokenRequestUrl
     ? fetch(
         // Append audience query param if requested. The runner will ignore it if the permission is not granted.
@@ -82,68 +82,64 @@ let tokenP =
         issueCommand("add-mask", runtimeToken);
         setOutput("runtime-token", runtimeToken);
         return runtimeToken;
-      });
+      })
+).then((token) =>
+  // Exchange the token at exchange-url if requested: POST it as a bearer and
+  // expose the `token` field of the JSON response (npm trusted publishing shape).
+  // A failed exchange fails the step; `token` passes through either way.
+  exchangeUrl
+    ? Promise.resolve(exchangeUrl)
+        .then((raw) => {
+          const url = new URL(raw);
+          // The token is a bearer credential: warn when it isn't sent over https.
+          if (url.protocol !== "https:") {
+            issueCommand(
+              "warning",
+              `exchange-url is not https; the token will be sent unencrypted: ${exchangeUrl}`,
+            );
+          }
+          if (!token) throw new Error("no token available to exchange");
+          return fetch(url, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+          });
+        })
+        .then(async (res) => {
+          if (!res.ok) {
+            const body = (await res.text().catch(() => "")).slice(0, 500);
+            throw new Error(`HTTP ${res.status}${body ? `: ${body}` : ""}`);
+          }
+          return res.json();
+        })
+        .then((data) => {
+          if (typeof data?.token !== "string" || !data.token) {
+            throw new Error("response missing token");
+          }
+          issueCommand("add-mask", data.token);
+          setOutput("exchange-token", data.token);
+          console.log("exchange_token=<set, masked>");
+        })
+        .catch((err) => {
+          issueCommand("error", `Failed to exchange token: ${err.message}`);
+          process.exitCode = 1;
+        })
+        .then(() => token)
+    : token,
+);
 
-tokenP
-  .then((token) => {
-    setOutput("token", token); // id-token if available, else runtime-token (see action.yml)
-    setOutput("runtime-url", runtimeUrl);
-    setOutput("results-url", resultsUrl);
-    setOutput("cache-url", cacheUrl);
-    setOutput("id-token-request-url", idTokenRequestUrl);
+tokenP.then((token) => {
+  setOutput("token", token); // id-token if available, else runtime-token (see action.yml)
+  setOutput("runtime-url", runtimeUrl);
+  setOutput("results-url", resultsUrl);
+  setOutput("cache-url", cacheUrl);
+  setOutput("id-token-request-url", idTokenRequestUrl);
 
-    console.log(`id_token_request_url=${idTokenRequestUrl || "<empty>"}`);
-    console.log(`runtime_url=${runtimeUrl || "<empty>"}`);
-    console.log(`results_url=${resultsUrl || "<empty>"}`);
-    console.log(`cache_url=${cacheUrl || "<empty>"}`);
-    console.log(`token=${token ? "<set, masked>" : "<empty>"}`);
-    return token;
-  })
-  .then((token) =>
-    // Exchange the token at exchange-url if requested: POST it as a bearer and
-    // expose the `token` field of the JSON response (npm trusted publishing shape).
-    exchangeUrl
-      ? Promise.resolve(new URL(exchangeUrl))
-          .then((url) => {
-            // The token is a bearer credential: warn when it isn't sent over https.
-            if (url.protocol !== "https:") {
-              issueCommand(
-                "warning",
-                `exchange-url is not https; the token will be sent unencrypted: ${exchangeUrl}`,
-              );
-            }
-            if (!token) throw new Error("no token available to exchange");
-            return fetch(url, {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: "application/json",
-              },
-            });
-          })
-          .then(async (res) => {
-            if (!res.ok) {
-              const body = (await res.text().catch(() => "")).slice(0, 500);
-              throw new Error(`HTTP ${res.status}${body ? `: ${body}` : ""}`);
-            }
-            return res.json();
-          })
-          .then((data) => {
-            if (typeof data?.token !== "string" || !data.token) {
-              throw new Error("response missing token");
-            }
-            return data.token;
-          })
-          .then((exchangeToken) => {
-            issueCommand("add-mask", exchangeToken);
-            setOutput("exchange-token", exchangeToken);
-            console.log("exchange_token=<set, masked>");
-          })
-      : undefined,
-  )
-  .catch((err) => {
-    // A failed exchange fails the step rather than leaving consumers with an
-    // empty credential.
-    issueCommand("error", `Failed to exchange token: ${err.message}`);
-    process.exitCode = 1;
-  });
+  console.log(`id_token_request_url=${idTokenRequestUrl || "<empty>"}`);
+  console.log(`runtime_url=${runtimeUrl || "<empty>"}`);
+  console.log(`results_url=${resultsUrl || "<empty>"}`);
+  console.log(`cache_url=${cacheUrl || "<empty>"}`);
+  console.log(`token=${token ? "<set, masked>" : "<empty>"}`);
+});
