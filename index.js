@@ -14,6 +14,13 @@ function issueCommand(command, message) {
   process.stdout.write(`::${command}::${message}\n`);
 }
 
+// Mirrors @actions/core setFailed: log an error annotation and fail the step
+// without exiting early, so pending output writes still complete.
+function setFailed(message) {
+  issueCommand("error", message);
+  process.exitCode = 1;
+}
+
 function setOutput(name, value) {
   const filePath = process.env.GITHUB_OUTPUT;
   const val = value ?? "";
@@ -116,8 +123,7 @@ let tokenP = (
           return token;
         })
         .catch((err) => {
-          issueCommand("error", `Failed to exchange token: ${err.message}`);
-          process.exitCode = 1;
+          setFailed(`Failed to exchange token: ${err.message}`);
           return token;
         })
     : token,
