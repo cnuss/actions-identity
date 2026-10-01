@@ -152,16 +152,22 @@ jobs:
           need runtime-token "$RUNTIME_TOKEN"
           need runtime-url "$RUNTIME_URL"
           need token "$TOKEN"
-          if [ "$ID_TOKEN_EXCHANGE" != "exchanged-ok" ]; then
-            echo "::error::id-token-exchange should be the token returned by the exchange server"
-            fail=1
-          fi
           if [ "$TOKEN" != "$ID_TOKEN_EXCHANGE" ]; then
             echo "::error::token should equal id-token-exchange when id-token-exchange-url is set"
             fail=1
           fi
-          if [ "$(cat "$RUNNER_TEMP/exchange_bearer")" != "Bearer $ID_TOKEN" ]; then
-            echo "::error::exchange server should have received the id-token as a bearer"
+
+          # The mock exchange server mints a JWT recording the sha256 of the
+          # bearer it received; it must match the id-token this step produced.
+          b64url_decode() {
+            local s; s=$(printf '%s' "$1" | tr '_-' '/+')
+            case $(( ${#s} % 4 )) in 2) s="$s==";; 3) s="$s=";; esac
+            printf '%s' "$s" | base64 -d
+          }
+          want=$(printf '%s' "$ID_TOKEN" | sha256sum | cut -d' ' -f1)
+          got=$({ b64url_decode "$(printf '%s' "$ID_TOKEN_EXCHANGE" | cut -d. -f2)" | jq -r '.id_token_sha256 // empty'; } 2>/dev/null || true)
+          if [ "$got" != "$want" ]; then
+            echo "::error::exchange server should have received the id-token as a bearer (id_token_sha256: ${got:-<missing>})"
             fail=1
           fi
           exit "$fail"

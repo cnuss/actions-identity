@@ -1,9 +1,10 @@
 """Stub id-token exchange endpoint for the smoke job.
 
 Answers like npm trusted publishing: POST /token-exchange returns
-{"token": "exchanged-ok"}; any other path returns 403. The Authorization
-header of each request is written to $RUNNER_TEMP/exchange_bearer so the
-workflow can assert what was sent.
+{"token": <jwt>}; any other path returns 403. The token is an unsigned JWT
+(alg "none") whose claims describe the bearer it received: the id-token's
+sub/aud, and id_token_sha256 so the workflow can check which token was sent
+by decoding the claims, which survive log masking of the token itself.
 
 Usage: python3 mocks/token_exchange.py [port]
 
@@ -11,22 +12,54 @@ Daemonizes itself once the port is listening, so the command returns only
 when the server is ready: no `&`, and no wait loop in the workflow.
 """
 
+import base64
+import hashlib
 import json
 import os
 import sys
-import tempfile
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-OUT_DIR = os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8787
+
+
+def b64url_encode(data):
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def jwt_claims(token):
+    """Decode a JWT's payload without verifying it; {} if it isn't one."""
+    try:
+        payload = token.split(".")[1]
+        padded = payload + "=" * (-len(payload) % 4)
+        return json.loads(base64.urlsafe_b64decode(padded))
+    except (IndexError, ValueError):
+        return {}
+
+
+def mint_token(id_token):
+    claims = jwt_claims(id_token)
+    now = int(time.time())
+    header = {"alg": "none", "typ": "JWT"}
+    payload = {
+        "iss": "mocks/token_exchange.py",
+        "sub": claims.get("sub"),
+        "aud": claims.get("aud"),
+        "iat": now,
+        "exp": now + 300,
+        "id_token_sha256": hashlib.sha256(id_token.encode()).hexdigest(),
+    }
+    return ".".join(
+        b64url_encode(json.dumps(part, separators=(",", ":")).encode())
+        for part in (header, payload)
+    ) + "."
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
-        with open(os.path.join(OUT_DIR, "exchange_bearer"), "w") as f:
-            f.write(self.headers.get("Authorization", ""))
-        if self.path == "/token-exchange":
-            body = json.dumps({"token": "exchanged-ok"}).encode()
+        auth = self.headers.get("Authorization", "")
+        if self.path == "/token-exchange" and auth.startswith("Bearer "):
+            body = json.dumps({"token": mint_token(auth[len("Bearer "):])}).encode()
             self.send_response(200)
         else:
             body = b'{"message":"denied"}'
