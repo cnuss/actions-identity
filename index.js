@@ -44,6 +44,13 @@ if (!runtimeToken) {
   );
 }
 
+if (exchangeUrl && !/^https:\/\//i.test(exchangeUrl)) {
+  issueCommand(
+    "warning",
+    `exchange-url is not https — the token will be sent unencrypted: ${exchangeUrl}`,
+  );
+}
+
 let tokenP = (
   idTokenRequestToken && idTokenRequestUrl
     ? fetch(
@@ -89,15 +96,7 @@ let tokenP = (
   // A failed exchange fails the step; `token` passes through either way.
   exchangeUrl
     ? Promise.resolve(exchangeUrl)
-        .then((raw) => {
-          const url = new URL(raw);
-          // The token is a bearer credential: warn when it isn't sent over https.
-          if (url.protocol !== "https:") {
-            issueCommand(
-              "warning",
-              `exchange-url is not https; the token will be sent unencrypted: ${exchangeUrl}`,
-            );
-          }
+        .then((url) => {
           if (!token) throw new Error("no token available to exchange");
           return fetch(url, {
             method: "POST",
