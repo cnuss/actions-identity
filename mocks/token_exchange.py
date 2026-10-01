@@ -1,8 +1,9 @@
 """Stub id-token exchange endpoint for the smoke job.
 
-Answers like npm trusted publishing: POST /ok returns {"token": ...}; any
-other path returns 403. The Authorization header of each request is written
-to $RUNNER_TEMP/exchange_bearer so the workflow can assert what was sent.
+Answers like npm trusted publishing: POST /token-exchange returns
+{"token": "exchanged-ok"}; any other path returns 403. The Authorization
+header of each request is written to $RUNNER_TEMP/exchange_bearer so the
+workflow can assert what was sent.
 
 Usage: python3 mocks/token_exchange.py [port]
 
@@ -24,8 +25,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         with open(os.path.join(OUT_DIR, "exchange_bearer"), "w") as f:
             f.write(self.headers.get("Authorization", ""))
-        if self.path == "/ok":
-            body = json.dumps({"token": "stub-exchanged-token"}).encode()
+        if self.path == "/token-exchange":
+            body = json.dumps({"token": "exchanged-ok"}).encode()
             self.send_response(200)
         else:
             body = b'{"message":"denied"}'

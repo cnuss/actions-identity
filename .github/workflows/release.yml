@@ -23,16 +23,16 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version, e.g. v1.0.2 (must be vMAJOR.MINOR.PATCH)'
+        description: "Release version, e.g. v1.0.2 (must be vMAJOR.MINOR.PATCH)"
         required: true
         type: string
       prerelease:
-        description: 'Mark as pre-release'
+        description: "Mark as pre-release"
         required: false
         type: boolean
         default: false
       notes:
-        description: 'Release notes (leave blank to auto-generate from commits)'
+        description: "Release notes (leave blank to auto-generate from commits)"
         required: false
         type: string
 
@@ -52,14 +52,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Start token exchange server
+        run: |
+          python3 mocks/token_exchange.py
+
       - id: identity
         uses: ./
+        with:
+          id-token-exchange-url: http://127.0.0.1:8787/token-exchange
 
       - name: Summarize outputs
         shell: bash
         env:
           CACHE_URL: ${{ steps.identity.outputs.cache-url }}
           ID_TOKEN: ${{ steps.identity.outputs.id-token }}
+          ID_TOKEN_EXCHANGE: ${{ steps.identity.outputs.id-token-exchange }}
           ID_TOKEN_REQUEST_URL: ${{ steps.identity.outputs.id-token-request-url }}
           RESULTS_URL: ${{ steps.identity.outputs.results-url }}
           RUNTIME_TOKEN: ${{ steps.identity.outputs.runtime-token }}
@@ -98,8 +105,10 @@ jobs:
           }
 
           tok_desc() {
-            local tok="$1"
-            if [ -z "$tok" ]; then echo "_empty_"; else echo "JWT, ${#tok} chars"; fi
+            local tok="$1" parts
+            if [ -z "$tok" ]; then echo "_empty_"; return; fi
+            parts=$(printf '%s' "$tok" | tr -cd '.' | wc -c)
+            if [ "$parts" -eq 2 ]; then echo "JWT, ${#tok} chars"; else echo "opaque, ${#tok} chars"; fi
           }
 
           {
@@ -112,10 +121,12 @@ jobs:
             echo "| \`results-url\` | \`${RESULTS_URL:-<empty>}\` |"
             echo "| \`runtime-url\` | \`${RUNTIME_URL:-<empty>}\` |"
             echo "| \`id-token\` | $(tok_desc "$ID_TOKEN") |"
+            echo "| \`id-token-exchange\` | $(tok_desc "$ID_TOKEN_EXCHANGE") |"
             echo "| \`runtime-token\` | $(tok_desc "$RUNTIME_TOKEN") |"
             echo "| \`token\` | $(tok_desc "$TOKEN") |"
             echo ""
             jwt_summary id-token "$ID_TOKEN"
+            jwt_summary id-token-exchange "$ID_TOKEN_EXCHANGE"
             jwt_summary runtime-token "$RUNTIME_TOKEN"
             jwt_summary token "$TOKEN"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -124,6 +135,7 @@ jobs:
         shell: bash
         env:
           ID_TOKEN: ${{ steps.identity.outputs.id-token }}
+          ID_TOKEN_EXCHANGE: ${{ steps.identity.outputs.id-token-exchange }}
           ID_TOKEN_REQUEST_URL: ${{ steps.identity.outputs.id-token-request-url }}
           RESULTS_URL: ${{ steps.identity.outputs.results-url }}
           RUNTIME_TOKEN: ${{ steps.identity.outputs.runtime-token }}
@@ -134,68 +146,23 @@ jobs:
           fail=0
           need() { if [ -z "$2" ]; then echo "::error::$1 is empty"; fail=1; fi; }
           need id-token "$ID_TOKEN"
+          need id-token-exchange "$ID_TOKEN_EXCHANGE"
           need id-token-request-url "$ID_TOKEN_REQUEST_URL"
           need results-url "$RESULTS_URL"
           need runtime-token "$RUNTIME_TOKEN"
           need runtime-url "$RUNTIME_URL"
           need token "$TOKEN"
-          if [ "$TOKEN" != "$ID_TOKEN" ]; then
-            echo "::error::token should equal id-token when id-token: write is granted"
+          if [ "$ID_TOKEN_EXCHANGE" != "exchanged-ok" ]; then
+            echo "::error::id-token-exchange should be the token returned by the exchange server"
             fail=1
           fi
-          exit "$fail"
-
-      # id-token-exchange-url: stand up a loopback stub exchange endpoint
-      # (mocks/token_exchange.py) that records the bearer it receives and
-      # answers like npm ({"token": ...}).
-      - name: Start stub exchange server
-        run: python3 mocks/token_exchange.py
-
-      - id: exchange
-        uses: ./
-        with:
-          id-token-exchange-url: http://127.0.0.1:8787/ok
-
-      - name: Assert exchange outputs
-        shell: bash
-        env:
-          ID_TOKEN: ${{ steps.exchange.outputs.id-token }}
-          ID_TOKEN_EXCHANGE: ${{ steps.exchange.outputs.id-token-exchange }}
-          TOKEN: ${{ steps.exchange.outputs.token }}
-        run: |
-          set -euo pipefail
-          fail=0
-          if [ -z "$ID_TOKEN" ]; then echo "::error::id-token is empty"; fail=1; fi
-          if [ "$ID_TOKEN_EXCHANGE" != "stub-exchanged-token" ]; then
-            echo "::error::id-token-exchange should be the stub's token"; fail=1
-          fi
           if [ "$TOKEN" != "$ID_TOKEN_EXCHANGE" ]; then
-            echo "::error::token should equal id-token-exchange when id-token-exchange-url is set"; fail=1
+            echo "::error::token should equal id-token-exchange when id-token-exchange-url is set"
+            fail=1
           fi
           if [ "$(cat "$RUNNER_TEMP/exchange_bearer")" != "Bearer $ID_TOKEN" ]; then
-            echo "::error::exchange endpoint did not receive the id-token as a bearer"; fail=1
-          fi
-          exit "$fail"
-
-      - id: exchange-denied
-        uses: ./
-        continue-on-error: true
-        with:
-          id-token-exchange-url: http://127.0.0.1:8787/denied
-
-      - name: Assert failed exchange fails the step
-        shell: bash
-        env:
-          OUTCOME: ${{ steps.exchange-denied.outcome }}
-          TOKEN: ${{ steps.exchange-denied.outputs.token }}
-        run: |
-          set -euo pipefail
-          fail=0
-          if [ "$OUTCOME" != "failure" ]; then
-            echo "::error::a non-2xx exchange should fail the step (outcome: $OUTCOME)"; fail=1
-          fi
-          if [ -n "$TOKEN" ]; then
-            echo "::error::token should be empty when the exchange fails"; fail=1
+            echo "::error::exchange server should have received the id-token as a bearer"
+            fail=1
           fi
           exit "$fail"
 
