@@ -54,7 +54,6 @@ const idTokenRequestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN || "";
 const idTokenRequestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL || "";
 const idTokenAudience = process.env["INPUT_ID-TOKEN-AUDIENCE"] || "";
 const exchangeUrl = process.env["INPUT_EXCHANGE-URL"] || "";
-const tokenFileInput = process.env["INPUT_TOKEN-FILE"] || "";
 
 if (!runtimeToken) {
   issueCommand(
@@ -145,23 +144,13 @@ tokenP.then((token) => {
   setOutput("token", token); // id-token if available, else runtime-token (see action.yml)
 
   // Random name so two steps in one job don't share a file.
-  const tokenFile = tokenFileInput
-    ? path.resolve(tokenFileInput)
-    : path.join(
-        process.env.RUNNER_TEMP || os.tmpdir(),
-        `actions-identity-${crypto.randomUUID()}.token`,
-      );
+  const tokenFile = path.join(
+    process.env.RUNNER_TEMP || os.tmpdir(),
+    `actions-identity-${crypto.randomUUID()}.token`,
+  );
   setState("token-file", tokenFile);
   try {
-    fs.mkdirSync(path.dirname(tokenFile), { recursive: true });
-    // open()'s mode only applies on create; fchmod an existing file before writing.
-    const fd = fs.openSync(tokenFile, "w", 0o600);
-    try {
-      fs.fchmodSync(fd, 0o600);
-      fs.writeSync(fd, token);
-    } finally {
-      fs.closeSync(fd);
-    }
+    fs.writeFileSync(tokenFile, token, { mode: 0o600, flag: "wx" });
     setOutput("token-file", tokenFile);
   } catch (err) {
     setFailed(`Failed to write token file: ${err.message}`);

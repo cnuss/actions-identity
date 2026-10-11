@@ -33,7 +33,6 @@ file and exposes its path as `token-file`.
 | ------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id-token-audience` | no       | Audience (`aud` claim) for the OIDC id-token. Appended as `&audience=` to the token request. Ignored when `id-token: write` is not granted.                                                                       |
 | `exchange-url`      | no       | URL to exchange `token` at. `token` is POSTed as `Authorization: Bearer`; the `token` field of the JSON response becomes the `exchange-token` output. Warns if not `https`. Fails the step if the exchange fails. |
-| `token-file`        | no       | Path to write `token` to. Defaults to a uniquely named file under `$RUNNER_TEMP`. Removed in the post step.                                                                                                       |
 
 ## Outputs
 
@@ -149,10 +148,9 @@ jobs:
 ```
 
 The file is written with mode `0600` and no trailing newline, under
-`$RUNNER_TEMP` with a name unique to the step. Set the `token-file` input to
-choose the path instead. A post step removes the file when the job ends. The
-file is not refreshed; for a long job, run the step again before the token
-expires.
+`$RUNNER_TEMP` with a name unique to the step. A post step removes the file
+when the job ends. The file is not refreshed; for a long job, run the step
+again before the token expires.
 
 ## Notes
 

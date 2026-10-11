@@ -61,10 +61,8 @@ jobs:
         with:
           exchange-url: http://127.0.0.1:8787/token-exchange
 
-      - id: identity-fixed
+      - id: identity-2
         uses: ./
-        with:
-          token-file: ${{ runner.temp }}/fixed/identity.token
 
       - name: Summarize outputs
         shell: bash
@@ -147,9 +145,8 @@ jobs:
           RUNTIME_URL: ${{ steps.identity.outputs.runtime-url }}
           TOKEN: ${{ steps.identity.outputs.token }}
           TOKEN_FILE: ${{ steps.identity.outputs.token-file }}
-          FIXED_TOKEN: ${{ steps.identity-fixed.outputs.token }}
-          FIXED_TOKEN_FILE: ${{ steps.identity-fixed.outputs.token-file }}
-          FIXED_TOKEN_FILE_WANT: ${{ runner.temp }}/fixed/identity.token
+          TOKEN_2: ${{ steps.identity-2.outputs.token }}
+          TOKEN_FILE_2: ${{ steps.identity-2.outputs.token-file }}
         run: |
           set -euo pipefail
           fail=0
@@ -162,7 +159,7 @@ jobs:
           need token "$TOKEN"
           need exchange-token "$EXCHANGE_TOKEN"
           need token-file "$TOKEN_FILE"
-          need identity-fixed.token-file "$FIXED_TOKEN_FILE"
+          need identity-2.token-file "$TOKEN_FILE_2"
           if [ "$TOKEN" != "$ID_TOKEN" ]; then
             echo "::error::token should equal id-token when id-token: write is granted"
             fail=1
@@ -181,13 +178,15 @@ jobs:
             fi
           }
           check_file token-file "$TOKEN_FILE" "$TOKEN"
-          check_file identity-fixed.token-file "$FIXED_TOKEN_FILE" "$FIXED_TOKEN"
-          case "$TOKEN_FILE" in
-            "$RUNNER_TEMP"/*) ;;
-            *) echo "::error::token-file $TOKEN_FILE is not under RUNNER_TEMP"; fail=1 ;;
-          esac
-          if [ "$FIXED_TOKEN_FILE" != "$FIXED_TOKEN_FILE_WANT" ]; then
-            echo "::error::identity-fixed.token-file is $FIXED_TOKEN_FILE, want $FIXED_TOKEN_FILE_WANT"
+          check_file identity-2.token-file "$TOKEN_FILE_2" "$TOKEN_2"
+          for f in "$TOKEN_FILE" "$TOKEN_FILE_2"; do
+            case "$f" in
+              "$RUNNER_TEMP"/*) ;;
+              *) echo "::error::token-file $f is not under RUNNER_TEMP"; fail=1 ;;
+            esac
+          done
+          if [ "$TOKEN_FILE" = "$TOKEN_FILE_2" ]; then
+            echo "::error::two steps share token-file $TOKEN_FILE"
             fail=1
           fi
           exit "$fail"
