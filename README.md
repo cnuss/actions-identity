@@ -46,7 +46,7 @@ file and exposes its path as `token-file`.
 | `runtime-token`        | `ACTIONS_RUNTIME_TOKEN` — per-job bearer for the Actions services. Masked in logs.                                  |
 | `runtime-url`          | `ACTIONS_RUNTIME_URL` — pipelines service base URL for the job.                                                     |
 | `token`                | Resolved identity token: the OIDC id-token when `id-token: write` is granted, else `runtime-token`. Masked in logs. |
-| `token-file`           | Path to a file holding `token` (mode `0600`, no trailing newline). Removed in the post step.                        |
+| `token-file`           | Path to a file holding `token` (mode `0600`, no trailing newline).                                                  |
 
 ## Usage
 
@@ -148,9 +148,8 @@ jobs:
 ```
 
 The file is written with mode `0600` and no trailing newline, under
-`$RUNNER_TEMP` with a name unique to the step. A post step removes the file
-when the job ends. The file is not refreshed; for a long job, run the step
-again before the token expires.
+`$RUNNER_TEMP` with a name unique to the step. The file is not refreshed; for
+a long job, run the step again before the token expires.
 
 ## Notes
 

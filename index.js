@@ -24,20 +24,11 @@ function setFailed(message) {
 }
 
 function setOutput(name, value) {
-  fileCommand("GITHUB_OUTPUT", "set-output", name, value);
-}
-
-// Read back by post.js as STATE_<name>.
-function setState(name, value) {
-  fileCommand("GITHUB_STATE", "save-state", name, value);
-}
-
-function fileCommand(envVar, command, name, value) {
-  const filePath = process.env[envVar];
+  const filePath = process.env.GITHUB_OUTPUT;
   const val = value ?? "";
   if (!filePath) {
     // Fallback for older runners without the file command.
-    issueCommand(`${command} name=${name}`, val);
+    issueCommand("set-output name=" + name, val);
     return;
   }
   // Heredoc form is multiline/special-char safe. Random delimiter avoids
@@ -140,13 +131,12 @@ let tokenP = (
     : token,
 ).then((token) => {
   // Write the token to a file for tools that read it from a path. Random name
-  // so two steps in one job don't share a file; post.js removes it.
+  // so two steps in one job don't share a file.
   // A failed write fails the step; `token` passes through either way.
   const tokenFile = path.join(
     process.env.RUNNER_TEMP || os.tmpdir(),
     `actions-identity-${crypto.randomUUID()}.token`,
   );
-  setState("token-file", tokenFile);
   return fs.promises
     .writeFile(tokenFile, token, { mode: 0o600, flag: "wx" })
     .then(() => {

@@ -31,9 +31,8 @@ outputs:
   token:
     description: "Resolved identity token. Prefers id-token (OIDC JWT) when id-token: write is granted; falls back to runtime-token otherwise. Masked in logs."
   token-file:
-    description: "Path to a file holding the `token` output (mode 0600, no trailing newline, uniquely named under $RUNNER_TEMP), for tools that read a token from a path. Removed in the post step."
+    description: "Path to a file holding the `token` output (mode 0600, no trailing newline, uniquely named under $RUNNER_TEMP), for tools that read a token from a path."
 
 runs:
   using: "node24"
   main: "index.js"
-  post: "post.js"
