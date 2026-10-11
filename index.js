@@ -8,6 +8,8 @@
 // Dependency-free: no @actions/core, no node_modules, no build step.
 
 const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const crypto = require("crypto");
 
 function issueCommand(command, message) {
@@ -127,7 +129,26 @@ let tokenP = (
           return token;
         })
     : token,
-);
+).then((token) => {
+  // Write the token to a file for tools that read it from a path. Random name
+  // so two steps in one job don't share a file.
+  // A failed write fails the step; `token` passes through either way.
+  const tokenFile = path.join(
+    process.env.RUNNER_TEMP || os.tmpdir(),
+    `actions-identity-${crypto.randomUUID()}.token`,
+  );
+  return fs.promises
+    .writeFile(tokenFile, token, { mode: 0o600, flag: "wx" })
+    .then(() => {
+      setOutput("token-file", tokenFile);
+      console.log(`token_file=${tokenFile}`);
+      return token;
+    })
+    .catch((err) => {
+      setFailed(`Failed to write token file: ${err.message}`);
+      return token;
+    });
+});
 
 tokenP.then((token) => {
   setOutput("token", token); // id-token if available, else runtime-token (see action.yml)
