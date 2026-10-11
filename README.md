@@ -24,12 +24,16 @@ exchange endpoint for their own short-lived token. Set `exchange-url` and the
 action does that exchange for you: it POSTs `token` there and exposes the
 result as `exchange-token`.
 
+Some tools only read a token from a file. The action also writes `token` to a
+file and exposes its path as `token-file`.
+
 ## Inputs
 
 | input               | required | description                                                                                                                                                                                                       |
 | ------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `id-token-audience` | no       | Audience (`aud` claim) for the OIDC id-token. Appended as `&audience=` to the token request. Ignored when `id-token: write` is not granted.                                                                       |
 | `exchange-url`      | no       | URL to exchange `token` at. `token` is POSTed as `Authorization: Bearer`; the `token` field of the JSON response becomes the `exchange-token` output. Warns if not `https`. Fails the step if the exchange fails. |
+| `token-file`        | no       | Path to write `token` to. Defaults to a uniquely named file under `$RUNNER_TEMP`. Removed in the post step.                                                                                                       |
 
 ## Outputs
 
@@ -43,6 +47,7 @@ result as `exchange-token`.
 | `runtime-token`        | `ACTIONS_RUNTIME_TOKEN` — per-job bearer for the Actions services. Masked in logs.                                  |
 | `runtime-url`          | `ACTIONS_RUNTIME_URL` — pipelines service base URL for the job.                                                     |
 | `token`                | Resolved identity token: the OIDC id-token when `id-token: write` is granted, else `runtime-token`. Masked in logs. |
+| `token-file`           | Path to a file holding `token` (mode `0600`, no trailing newline). Removed in the post step.                        |
 
 ## Usage
 
@@ -121,6 +126,33 @@ jobs:
         run: |
           curl -sSf -H "Authorization: Bearer $API_TOKEN" https://api.example.com/whoami
 ```
+
+### Token as a file
+
+For tools that read a token from a path rather than a value, use `token-file`:
+
+```yaml
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - id: identity
+        uses: cnuss/actions-identity@main
+
+      - shell: bash
+        env:
+          TOKEN_FILE: ${{ steps.identity.outputs.token-file }}
+        run: |
+          curl -sSf -H "Authorization: Bearer $(cat "$TOKEN_FILE")" https://api.example.com/whoami
+```
+
+The file is written with mode `0600` and no trailing newline, under
+`$RUNNER_TEMP` with a name unique to the step. Set the `token-file` input to
+choose the path instead. A post step removes the file when the job ends. The
+file is not refreshed; for a long job, run the step again before the token
+expires.
 
 ## Notes
 

@@ -61,6 +61,11 @@ jobs:
         with:
           exchange-url: http://127.0.0.1:8787/token-exchange
 
+      - id: identity-fixed
+        uses: ./
+        with:
+          token-file: ${{ runner.temp }}/fixed/identity.token
+
       - name: Summarize outputs
         shell: bash
         env:
@@ -72,6 +77,7 @@ jobs:
           RUNTIME_TOKEN: ${{ steps.identity.outputs.runtime-token }}
           RUNTIME_URL: ${{ steps.identity.outputs.runtime-url }}
           TOKEN: ${{ steps.identity.outputs.token }}
+          TOKEN_FILE: ${{ steps.identity.outputs.token-file }}
         run: |
           set -euo pipefail
 
@@ -122,6 +128,7 @@ jobs:
             echo "| \`runtime-token\` | $(tok_desc "$RUNTIME_TOKEN") |"
             echo "| \`token\` | $(tok_desc "$TOKEN") |"
             echo "| \`exchange-token\` | $(tok_desc "$EXCHANGE_TOKEN") |"
+            echo "| \`token-file\` | \`${TOKEN_FILE:-<empty>}\` |"
             echo ""
             jwt_summary id-token "$ID_TOKEN"
             jwt_summary runtime-token "$RUNTIME_TOKEN"
@@ -139,6 +146,10 @@ jobs:
           RUNTIME_TOKEN: ${{ steps.identity.outputs.runtime-token }}
           RUNTIME_URL: ${{ steps.identity.outputs.runtime-url }}
           TOKEN: ${{ steps.identity.outputs.token }}
+          TOKEN_FILE: ${{ steps.identity.outputs.token-file }}
+          FIXED_TOKEN: ${{ steps.identity-fixed.outputs.token }}
+          FIXED_TOKEN_FILE: ${{ steps.identity-fixed.outputs.token-file }}
+          FIXED_TOKEN_FILE_WANT: ${{ runner.temp }}/fixed/identity.token
         run: |
           set -euo pipefail
           fail=0
@@ -150,8 +161,33 @@ jobs:
           need runtime-url "$RUNTIME_URL"
           need token "$TOKEN"
           need exchange-token "$EXCHANGE_TOKEN"
+          need token-file "$TOKEN_FILE"
+          need identity-fixed.token-file "$FIXED_TOKEN_FILE"
           if [ "$TOKEN" != "$ID_TOKEN" ]; then
             echo "::error::token should equal id-token when id-token: write is granted"
+            fail=1
+          fi
+          # file holds exactly the token, mode 0600
+          check_file() {
+            local name="$1" file="$2" want="$3"
+            if [ ! -f "$file" ]; then
+              echo "::error::$name: $file does not exist"; fail=1; return
+            fi
+            if [ "$(stat -c %a "$file")" != "600" ]; then
+              echo "::error::$name: $file mode is $(stat -c %a "$file"), want 600"; fail=1
+            fi
+            if [ "$(cat "$file"; echo x)" != "${want}x" ]; then
+              echo "::error::$name: $file contents differ from token"; fail=1
+            fi
+          }
+          check_file token-file "$TOKEN_FILE" "$TOKEN"
+          check_file identity-fixed.token-file "$FIXED_TOKEN_FILE" "$FIXED_TOKEN"
+          case "$TOKEN_FILE" in
+            "$RUNNER_TEMP"/*) ;;
+            *) echo "::error::token-file $TOKEN_FILE is not under RUNNER_TEMP"; fail=1 ;;
+          esac
+          if [ "$FIXED_TOKEN_FILE" != "$FIXED_TOKEN_FILE_WANT" ]; then
+            echo "::error::identity-fixed.token-file is $FIXED_TOKEN_FILE, want $FIXED_TOKEN_FILE_WANT"
             fail=1
           fi
           exit "$fail"

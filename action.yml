@@ -12,6 +12,9 @@ inputs:
   exchange-url:
     description: "Optional URL to exchange the resolved token at for a service-issued token. When set, the `token` output is POSTed as a bearer token and the `token` field of the JSON response becomes the `exchange-token` output. Warns if not https. Fails the step if the exchange fails."
     required: false
+  token-file:
+    description: "Optional path to write the resolved token to. Defaults to a uniquely named file under $RUNNER_TEMP. Removed in the post step."
+    required: false
 
 outputs:
   cache-url:
@@ -30,7 +33,10 @@ outputs:
     description: "ACTIONS_RUNTIME_URL — the pipelines service base URL for this job."
   token:
     description: "Resolved identity token. Prefers id-token (OIDC JWT) when id-token: write is granted; falls back to runtime-token otherwise. Masked in logs."
+  token-file:
+    description: "Path to a file holding the `token` output (mode 0600, no trailing newline), for tools that read a token from a path. Removed in the post step."
 
 runs:
   using: "node24"
   main: "index.js"
+  post: "post.js"

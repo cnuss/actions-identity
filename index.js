@@ -8,6 +8,8 @@
 // Dependency-free: no @actions/core, no node_modules, no build step.
 
 const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const crypto = require("crypto");
 
 function issueCommand(command, message) {
@@ -22,11 +24,20 @@ function setFailed(message) {
 }
 
 function setOutput(name, value) {
-  const filePath = process.env.GITHUB_OUTPUT;
+  fileCommand("GITHUB_OUTPUT", "set-output", name, value);
+}
+
+// Read back by post.js as STATE_<name>.
+function setState(name, value) {
+  fileCommand("GITHUB_STATE", "save-state", name, value);
+}
+
+function fileCommand(envVar, command, name, value) {
+  const filePath = process.env[envVar];
   const val = value ?? "";
   if (!filePath) {
     // Fallback for older runners without the file command.
-    issueCommand("set-output name=" + name, val);
+    issueCommand(`${command} name=${name}`, val);
     return;
   }
   // Heredoc form is multiline/special-char safe. Random delimiter avoids
@@ -43,6 +54,7 @@ const idTokenRequestToken = process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN || "";
 const idTokenRequestUrl = process.env.ACTIONS_ID_TOKEN_REQUEST_URL || "";
 const idTokenAudience = process.env["INPUT_ID-TOKEN-AUDIENCE"] || "";
 const exchangeUrl = process.env["INPUT_EXCHANGE-URL"] || "";
+const tokenFileInput = process.env["INPUT_TOKEN-FILE"] || "";
 
 if (!runtimeToken) {
   issueCommand(
@@ -131,6 +143,30 @@ let tokenP = (
 
 tokenP.then((token) => {
   setOutput("token", token); // id-token if available, else runtime-token (see action.yml)
+
+  // Random name so two steps in one job don't share a file.
+  const tokenFile = tokenFileInput
+    ? path.resolve(tokenFileInput)
+    : path.join(
+        process.env.RUNNER_TEMP || os.tmpdir(),
+        `actions-identity-${crypto.randomUUID()}.token`,
+      );
+  setState("token-file", tokenFile);
+  try {
+    fs.mkdirSync(path.dirname(tokenFile), { recursive: true });
+    // open()'s mode only applies on create; fchmod an existing file before writing.
+    const fd = fs.openSync(tokenFile, "w", 0o600);
+    try {
+      fs.fchmodSync(fd, 0o600);
+      fs.writeSync(fd, token);
+    } finally {
+      fs.closeSync(fd);
+    }
+    setOutput("token-file", tokenFile);
+  } catch (err) {
+    setFailed(`Failed to write token file: ${err.message}`);
+  }
+
   setOutput("runtime-url", runtimeUrl);
   setOutput("results-url", resultsUrl);
   setOutput("cache-url", cacheUrl);
@@ -141,4 +177,5 @@ tokenP.then((token) => {
   console.log(`results_url=${resultsUrl || "<empty>"}`);
   console.log(`cache_url=${cacheUrl || "<empty>"}`);
   console.log(`token=${token ? "<set, masked>" : "<empty>"}`);
+  console.log(`token_file=${tokenFile}`);
 });
