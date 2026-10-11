@@ -138,24 +138,30 @@ let tokenP = (
           return token;
         })
     : token,
-);
-
-tokenP.then((token) => {
-  setOutput("token", token); // id-token if available, else runtime-token (see action.yml)
-
-  // Random name so two steps in one job don't share a file.
+).then((token) => {
+  // Write the token to a file for tools that read it from a path. Random name
+  // so two steps in one job don't share a file; post.js removes it.
+  // A failed write fails the step; `token` passes through either way.
   const tokenFile = path.join(
     process.env.RUNNER_TEMP || os.tmpdir(),
     `actions-identity-${crypto.randomUUID()}.token`,
   );
   setState("token-file", tokenFile);
-  try {
-    fs.writeFileSync(tokenFile, token, { mode: 0o600, flag: "wx" });
-    setOutput("token-file", tokenFile);
-  } catch (err) {
-    setFailed(`Failed to write token file: ${err.message}`);
-  }
+  return fs.promises
+    .writeFile(tokenFile, token, { mode: 0o600, flag: "wx" })
+    .then(() => {
+      setOutput("token-file", tokenFile);
+      console.log(`token_file=${tokenFile}`);
+      return token;
+    })
+    .catch((err) => {
+      setFailed(`Failed to write token file: ${err.message}`);
+      return token;
+    });
+});
 
+tokenP.then((token) => {
+  setOutput("token", token); // id-token if available, else runtime-token (see action.yml)
   setOutput("runtime-url", runtimeUrl);
   setOutput("results-url", resultsUrl);
   setOutput("cache-url", cacheUrl);
@@ -166,5 +172,4 @@ tokenP.then((token) => {
   console.log(`results_url=${resultsUrl || "<empty>"}`);
   console.log(`cache_url=${cacheUrl || "<empty>"}`);
   console.log(`token=${token ? "<set, masked>" : "<empty>"}`);
-  console.log(`token_file=${tokenFile}`);
 });
